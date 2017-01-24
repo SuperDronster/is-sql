@@ -1,10 +1,14 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource Count File
+	Constant:
+		tag.group_id = 2 (File Type Tags)
 ---------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
 
 -------------------------------------------------------------------------------
+
+SELECT core.new_tag(2,NULL, 'resource-item-count', 'Resource Item-Count File.');
 
 CREATE TABLE rc_item_count(
 	rc_value_count integer,
@@ -21,8 +25,6 @@ CREATE TRIGGER delete_rcitemcount_trigger
 CREATE TRIGGER create_rcitemcount_trigger
 	BEFORE INSERT ON rc_item_count FOR EACH ROW
 	EXECUTE PROCEDURE core.__on_create_file_trigger();
-
-SELECT core.new_tag(5,NULL, 'rc-item-count-file', 'Resource Item-Count File.');
 
 --------------------------------------------------------------------------------
 
@@ -67,7 +69,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id(5, 'rc-item-count-file'),
+		res_id, p_creator_id, core.tag_id(2, 'rc-item-count-file'),
     core.canonical_string(p_system_name), name, p_is_packable, p_is_readonly,
     p_color, core.tag_id(10, p_sides_tag_name), p_value_count
 	);

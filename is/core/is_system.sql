@@ -9,16 +9,28 @@ SET search_path TO "core";
 
 	Tag Group ID:
 		1 - Unit Names
-		2 - Global Enum Names
-		3 - Global Enum Values
-		4 - Folder Types
-		5 - File Types
-			'rc-item-count-file'
-		6 - Resource Layout Names
-		10 - RC Sides Enum Names
-		11 - RC Sides Enum Values
+		2 - File Types
+			'resource-item-count'
+		3 - Resource Layout Kinds
+			'item-range-node'
+			'item-range-data'
+		4 - Resource Layout Names
 
 ----------------------------------------------------------------------------- */
+
+CREATE TABLE _record_rel(
+	type integer NOT NULL,
+	parent_table_oid oid NOT NULL,
+	parent_rec_kind bigint NOT NULL,
+	child_table_oid oid NOT NULL,
+	child_rec_kind bigint NOT NULL,
+	child_rec_count integer NOT NULL DEFAULT (-1),
+	visual_name varchar DEFAULT NULL,
+	CONSTRAINT rec_relation_pk PRIMARY KEY (
+		type,
+		parent_table_oid,parent_rec_kind,
+		child_table_oid,child_rec_kind)
+);
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
@@ -116,4 +128,57 @@ END;
 $$ LANGUAGE plpgsql
 IMMUTABLE;
 
+--------------------------------------------------------------------------------
+
+/* -----------------------------------------------------------------------------
+	Создает разрешение на вставку файла в дерево
 ----------------------------------------------------------------------------- */
+CREATE  OR REPLACE FUNCTION _add_record_rel(
+	p_type integer,
+	p_parent_rec_kind bigint,
+	p_child_table_oid oid,
+	p_child_rec_kind bigint,
+	p_child_rec_count integer,
+	p_name varchar
+) RETURNS void AS $$
+BEGIN
+	INSERT INTO core._record_rel
+	(
+		type, parent_table_oid, parent_rec_kind,
+		child_table_oid, child_rec_kind, child_rec_count,
+		visual_name
+	)
+	VALUES
+	(
+		p_type, p_parent_table_oid, p_parent_rec,
+		p_child_table_oid, p_child_rec_kind,
+		p_child_rec_count, p_name
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
+	Проверяет можно ли добавить файла в дерево
+----------------------------------------------------------------------------- */
+CREATE  OR REPLACE FUNCTION _check_record_rel(
+	p_type integer,
+	p_parent_table_oid oid,
+	p_parent_rec_kind bigint,
+	p_child_table_oid oid,
+	p_child_rec_kind bigint
+) RETURNS integer AS $$
+DECLARE
+	count integer;
+BEGIN
+	SELECT child_rec_count INTO count
+	FROM core._record_rel
+	WHERE
+		type=p_type AND
+		parent_table_oid=p_parent_table_oid AND
+		parent_rec_kind=p_parent_rec_kind AND
+		child_table_oid=p_child_table_oid AND
+		child_rec_kind=p_child_rec_kind;
+
+	RETURN count;
+END;
+$$ LANGUAGE plpgsql;

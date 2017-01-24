@@ -1,5 +1,10 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource File and System
+	Constant:
+		_record_rel.type = 2 (Parent Resource Layout Node ->
+													Child Resource Layout Node)
+		tag.group_id = 3 (Resource Layout Kinds)
+		tag.group_id = 4 (Resource Layout Names)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
@@ -12,6 +17,7 @@ CREATE TABLE rc_layout(
 	layout_id bigint NOT NULL DEFAULT nextval('spec.rclayout_id_seq'),
 	parent_ptr bigint DEFAULT NULL,
 	resource_ptr bigint DEFAULT NULL,
+	layout_kind bigint NOT NULL REFERENCES core.tag(id),
 	is_virtual boolean DEFAULT true,
 	name bigint NOT NULL REFERENCES core.tag(id),
 	color integer NOT NULL DEFAULT 0,
@@ -110,6 +116,7 @@ CREATE OR REPLACE FUNCTION new_rc_layout_node(
 	p_layout_id bigint,
   p_resource_ptr bigint,
   p_parent_ptr bigint,
+	p_kind_tag_name varchar(128),
 	p_name_tag_name varchar(128),
 	p_color integer DEFAULT 0
 ) RETURNS bigint AS $$
@@ -125,12 +132,13 @@ BEGIN
 
 	INSERT INTO spec.rc_layout
 	(
-		layout_id, parent_ptr, resource_ptr, name, color, is_virtual
+		layout_id, parent_ptr, resource_ptr, layout_kind, name,
+		color, is_virtual
 	)
 	VALUES
 	(
-		res_id, p_parent_ptr, p_resource_ptr,
-		core.tag_id(6, p_name_tag_name), p_color, true
+		res_id, p_parent_ptr, p_resource_ptr, core.tag_id(3, p_kind_tag_name),
+		core.tag_id(4, p_name_tag_name), p_color, true
 	);
 
 	RETURN res_id;
@@ -159,7 +167,7 @@ BEGIN
 	count := array_length(names,1);
 
 	curr_path := names[1];
-	name_id := core.tag_id(6,names[1]);
+	name_id := core.tag_id(4,names[1]);
 
 	SELECT layout_id, tableoid
 	INTO prev_id, a_type
@@ -173,7 +181,7 @@ BEGIN
 		FOR i IN 2..count
 		LOOP
 			curr_path := curr_path || '/' || names[i];
-			name_id := core.tag_id(6,names[i]);
+			name_id := core.tag_id(4,names[i]);
 
 			SELECT layout_id, tableoid
 			INTO curr_id, a_type

@@ -27,10 +27,10 @@ CREATE TABLE enum_value
 	Создает значение перечисления
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION new_enum_value(
+	p_enum_type integer,
 	p_enum_tag_name varchar(128),
+	p_value_type integer,
 	p_value_tag_name varchar(128),
-	p_enum_type integer DEFAULT 2,
-	p_value_type integer DEFAULT 3
 ) RETURNS void AS $$
 DECLARE
 BEGIN
@@ -50,18 +50,20 @@ $$ LANGUAGE plpgsql;
 	Удаляет значение перечисления
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION del_enum_value(
+	p_enum_type integer,
 	p_enum_tag_name varchar(128),
+	p_value_type integer,
 	p_value_tag_name varchar(128),
-	p_enum_type integer DEFAULT 2,
-	p_value_type integer DEFAULT 3
 ) RETURNS boolean AS $$
 DECLARE
  count integer;
+ e_id bigint := core.tag_id(p_enum_type, p_enum_tag_name);
+ v_id bigint := core.tag_id(p_value_type, p_value_tag_name);
 BEGIN
 	DELETE FROM enum_value
 	WHERE
-		enum_id = core.tag_id(p_enum_type, p_enum_tag_name) AND
-		value_id = core.tag_id(p_value_type, p_value_tag_name);
+		enum_id = e_id AND
+		value_id = v_id;
 	GET DIAGNOSTICS count = ROW_COUNT;
 
 	RETURN count <> 0;
@@ -73,8 +75,8 @@ $$ LANGUAGE plpgsql;
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION enum_value_id(
 	p_enum_id bigint,
+	p_value_type integer,
 	p_value_tag_name varchar(128),
-	p_value_type integer DEFAULT 3
 ) RETURNS bigint AS $$
 DECLARE
 	p_value_id bigint := core.tag_id(p_value_type, p_value_tag_name);
@@ -98,14 +100,14 @@ $$ LANGUAGE plpgsql;
 	Возвращает ид записи тега, соответствующего значению перечисления
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION enum_value_id(
+	p_enum_type integer,
 	p_enum_tag_name varchar(128),
+	p_value_type integer,
 	p_value_tag_name varchar(128),
-	p_enum_type integer DEFAULT 2,
-	p_value_type integer DEFAULT 3
 ) RETURNS bigint AS $$
 DECLARE
 BEGIN
 	RETURN core.enum_value_id(core.tag_id(p_enum_type, p_enum_tag_name),
-		p_value_tag_name, p_value_type);
+		p_value_type, p_value_tag_name);
 END;
 $$ LANGUAGE plpgsql;

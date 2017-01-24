@@ -1,16 +1,28 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource Item Range Layout
+	Constant:
+		_record_rel.type = 2 (Parent Resource Layout Node ->
+													Child Resource Layout Node)
+		tag.group_id = 3 (Resource Layout Kinds)
+		tag.group_id = 4 (Resource Layout Names)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
+SELECT core.new_tag(3,NULL, 'item-range-node', 'Item Range Root Rc Layout.');
+SELECT core.new_tag(3,NULL, 'item-range-root', 'Item Range Node Rc Layout.');
+SELECT core.new_tag(3,NULL, 'item-range-data', 'Item Range Data Rc Layout.');
+
 CREATE TABLE rc_layout_item_range(
 	item_range_lower_index integer NOT NULL,
 	item_range_high_index integer NOT NULL,
 	CONSTRAINT rclayoutir_id_pkey PRIMARY KEY (layout_id),
 	--CONSTRAINT rclayoutir_unique UNIQUE (resource_ptr, name),
+	CONSTRAINT rclayoutir_kind_fk FOREIGN KEY (layout_kind)
+		REFERENCES core.tag(id) MATCH SIMPLE
+		ON UPDATE NO ACTION ON DELETE NO ACTION,
 	CONSTRAINT rclayoutir_name_fk FOREIGN KEY (name)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION
@@ -54,14 +66,15 @@ BEGIN
 
 	INSERT INTO spec.rc_layout_item_range
 	(
-		layout_id, parent_ptr, resource_ptr, name,
+		layout_id, parent_ptr, resource_ptr, layout_kind, name,
 		item_range_lower_index, item_range_high_index, color,
 		is_virtual
 	)
 	VALUES
 	(
 		res_id, p_parent_ptr, p_resource_ptr,
-		core.tag_id(6, p_name_tag_name), p_lower_index,
+		core.tag_id(3, 'item-range-data'),
+		core.tag_id(4, p_name_tag_name), p_lower_index,
 		p_high_index, p_color, false
 	);
 

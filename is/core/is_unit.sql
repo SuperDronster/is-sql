@@ -1,5 +1,7 @@
 ﻿/* -----------------------------------------------------------------------------
 	Unit Value Functions.
+	_record_rel.type = 1 (Parent File -> Chld File Relation)
+	tag.group_id = 1 (Unit Name Tags)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "core";
@@ -53,7 +55,7 @@ CREATE TABLE Unit
 	CONSTRAINT unit_unique UNIQUE (system_name)
 );
 
--- Cast 
+-- Cast
 
 CREATE OR REPLACE FUNCTION string(
 	p_unit_value unit_value

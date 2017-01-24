@@ -1,6 +1,11 @@
 ﻿/* -----------------------------------------------------------------------------
 	File Functions.
+	Constant:
+		_record_rel.type = 1 (Parent File -> Chld File Relation)
+		tag.group_id = 2 (File Type Tags)
 ----------------------------------------------------------------------------- */
+
+
 
 SET search_path TO "core";
 
@@ -35,18 +40,6 @@ CREATE TABLE file_tree(
 );
 CREATE INDEX file_tree_parent_idx ON file_tree(parent_file_ptr);
 CREATE INDEX file_tree_child_idx ON file_tree(child_file_ptr);
-
-CREATE TABLE file_relation(
-	parent_table_oid oid NOT NULL,
-	parent_file_kind bigint NOT NULL,
-	child_table_oid oid NOT NULL,
-	child_file_kind bigint NOT NULL,
-	child_file_count integer NOT NULL DEFAULT (-1),
-	visual_name varchar DEFAULT NULL,
-	CONSTRAINT file_relation_pk PRIMARY KEY (
-		parent_table_oid,parent_file_kind,
-		child_table_oid,child_file_kind)
-);
 
 -- Triggers
 
@@ -182,76 +175,6 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 /* -----------------------------------------------------------------------------
-	Создает разрешение на вставку файла в дерево
------------------------------------------------------------------------------ */
-CREATE  OR REPLACE FUNCTION _new_file_relation(
-	p_parent_table_oid oid,
-	p_parent_file_kind_tag_name varchar(128),
-	p_child_table_oid oid,
-	p_child_file_kind_tag_name varchar(128),
-	p_child_file_count integer,
-	p_name varchar
-) RETURNS void AS $$
-BEGIN
-	INSERT INTO core.file_relation
-	(
-		parent_table_oid, parent_file_kind,
-		child_table_oid, child_file_kind, child_file_count,
-		visual_name
-	)
-	VALUES
-	(
-		p_parent_table_oid, core.tag_id(4,p_parent_file_kind_tag_name),
-		p_child_table_oid, core.tag_id(4,p_child_file_kind_tag_name),
-		p_child_file_count, p_name
-	);
-END;
-$$ LANGUAGE plpgsql;
-
-/* -----------------------------------------------------------------------------
-	Удаляет разрешение на вставку файла в дерево
------------------------------------------------------------------------------ */
-CREATE  OR REPLACE FUNCTION _del_file_relation(
-	p_parent_table_oid oid,
-	p_parent_file_kind_tag_name varchar(128),
-	p_child_table_oid oid,
-	p_child_file_kind_tag_name varchar(128)
-) RETURNS void AS $$
-BEGIN
-	DELETE FROM core.file_relation
-	WHERE
-		parent_table_oid=p_parent_table_oid AND
-		parent_file_kind=core.tag_id(4,p_parent_file_kind) AND
-		child_table_oid=p_child_table_oid AND
-		child_file_kind=core.tag_id(4,p_child_file_kind);
-END;
-$$ LANGUAGE plpgsql;
-
-/* -----------------------------------------------------------------------------
-	Проверяет можно ли добавить файла в дерево
------------------------------------------------------------------------------ */
-CREATE  OR REPLACE FUNCTION _check_file_relation(
-	p_parent_table_oid oid,
-	p_parent_file_kind bigint,
-	p_child_table_oid oid,
-	p_child_file_kind bigint
-) RETURNS integer AS $$
-DECLARE
-	count integer;
-BEGIN
-	SELECT child_file_count INTO count
-	FROM core.file_relation
-	WHERE
-		parent_table_oid=p_parent_table_oid AND
-		parent_file_kind=p_parent_file_kind AND
-		child_table_oid=p_child_table_oid AND
-		child_file_kind=p_child_file_kind;
-
-	RETURN count;
-END;
-$$ LANGUAGE plpgsql;
-
-/* -----------------------------------------------------------------------------
 	Создание дочерний ссылки на файл (через триггер у файла увеличивается счетчик
 	ref_counter на 1)
 ------------------------------------------------------------------------------*/
@@ -288,7 +211,7 @@ BEGIN
 			p_child_file_id));
 	END IF;
 
-	count_rel := core._check_file_relation(p_oid, p_kind, c_oid, c_kind);
+	count_rel := core._check_record_rel(1, p_oid, p_kind, c_oid, c_kind);
 	IF count_rel IS NULL THEN
 		PERFORM _error('Forbidden', format('File Relation [(%s)%s->(%s)%s] is forbidden.',
 			tag_name(p_kind),p_oid::regclass, tag_name(c_kind),c_oid::regclass));
@@ -380,7 +303,7 @@ CREATE OR REPLACE FUNCTION root_file_id(
 ) RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
-	kind_id bigint = core.tag_id(4, p_kind_tag_name);
+	kind_id bigint = core.tag_id(2, p_kind_tag_name);
 BEGIN
 	SELECT file_id INTO res_id
 	FROM file
