@@ -30,7 +30,7 @@ CREATE  OR REPLACE FUNCTION new_enum_value(
 	p_enum_type integer,
 	p_enum_tag_name varchar(128),
 	p_value_type integer,
-	p_value_tag_name varchar(128),
+	p_value_tag_name varchar(128)
 ) RETURNS void AS $$
 DECLARE
 BEGIN
@@ -53,7 +53,7 @@ CREATE  OR REPLACE FUNCTION del_enum_value(
 	p_enum_type integer,
 	p_enum_tag_name varchar(128),
 	p_value_type integer,
-	p_value_tag_name varchar(128),
+	p_value_tag_name varchar(128)
 ) RETURNS boolean AS $$
 DECLARE
  count integer;
@@ -76,7 +76,7 @@ $$ LANGUAGE plpgsql;
 CREATE  OR REPLACE FUNCTION enum_value_id(
 	p_enum_id bigint,
 	p_value_type integer,
-	p_value_tag_name varchar(128),
+	p_value_tag_name varchar(128)
 ) RETURNS bigint AS $$
 DECLARE
 	p_value_id bigint := core.tag_id(p_value_type, p_value_tag_name);
@@ -103,7 +103,7 @@ CREATE  OR REPLACE FUNCTION enum_value_id(
 	p_enum_type integer,
 	p_enum_tag_name varchar(128),
 	p_value_type integer,
-	p_value_tag_name varchar(128),
+	p_value_tag_name varchar(128)
 ) RETURNS bigint AS $$
 DECLARE
 BEGIN

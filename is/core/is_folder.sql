@@ -1,7 +1,7 @@
-/* -----------------------------------------------------------------------------
+﻿/* -----------------------------------------------------------------------------
 	Folder Functions.
 	Constant.
-		tag.group_id = 2 (Folder Type Tags)
+		tag.group_id = 2 (File Kind Tags)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "core";
@@ -65,7 +65,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id(4, p_kind_tag_name),
+		res_id, p_creator_id, core.tag_id(2, p_kind_tag_name),
 		core.canonical_string(p_system_name), name, p_is_packable,
 		p_is_readonly, p_color
 	);

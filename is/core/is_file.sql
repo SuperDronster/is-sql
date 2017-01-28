@@ -45,33 +45,22 @@ CREATE INDEX file_tree_child_idx ON file_tree(child_file_ptr);
 
 CREATE OR REPLACE FUNCTION __on_create_file_trigger() RETURNS trigger AS $$
 BEGIN
-	PERFORM __on_create_file(NEW.file_id);
+	PERFORM core.__on_create_file(NEW.file_id);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_delete_file_trigger() RETURNS trigger AS $$
 BEGIN
-	PERFORM __on_delete_file_(OLD.file_id, OLD.ref_counter);
+	PERFORM core.__on_delete_file_(OLD.file_id, OLD.ref_counter);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_insert_file_trigger() RETURNS trigger AS $$
 DECLARE
-	count integer;
 BEGIN
-	SELECT count(*) INTO count
-	FROM core.file
-	WHERE
-		file_id = NEW.parent_file_ptr;
-
-	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Parent File "id=%s" is not found.',
-			p_file_id));
-	END IF;
-
-	PERFORM core.__inc_file_ref(NEW.child_file_ptr);
+	PERFORM core.__on_insert_file(NEW.parent_file_ptr, NEW.child_file_ptr);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -88,7 +77,7 @@ CREATE TRIGGER remove_file_trigger
 	EXECUTE PROCEDURE __on_remove_file_trigger();
 
 CREATE TRIGGER insert_file_trigger
-	AFTER INSERT ON file_tree FOR EACH ROW
+	BEFORE INSERT ON file_tree FOR EACH ROW
 	EXECUTE PROCEDURE __on_insert_file_trigger();
 
 --------------------------------------------------------------------------------
@@ -96,6 +85,75 @@ CREATE TRIGGER insert_file_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+
+CREATE OR REPLACE FUNCTION __on_insert_file(
+	p_parent_file_id bigint,
+	p_child_file_id bigint
+) RETURNS void AS $$
+DECLARE
+	p_kind integer;
+	p_oid oid;
+	c_kind integer;
+	c_oid oid;
+	count integer;
+	count_rel integer;
+	s_name varchar;
+BEGIN
+	SELECT tableoid, file_kind INTO p_oid, p_kind
+	FROM core.file
+	WHERE
+		file_id = p_parent_file_id;
+	IF NOT FOUND THEN
+		PERFORM core._error('DataIsNotFound', format('Parent File "id=%s" is not found.',
+			p_parent_file_id));
+	END IF;
+
+	SELECT tableoid, file_kind, system_name INTO c_oid, c_kind, s_name
+	FROM core.file
+	WHERE
+		file_id = p_child_file_id;
+	IF NOT FOUND THEN
+		PERFORM core._error('DataIsNotFound', format('Child File "id=%s" is not found.',
+			p_child_file_id));
+	END IF;
+
+	count_rel := core._check_record_rel(1, p_oid, p_kind, c_oid, c_kind);
+	IF count_rel IS NULL THEN
+		PERFORM core._error('Forbidden', format('File Relation [(%s)%s->(%s)%s] is forbidden.',
+			core.tag_name(p_kind),p_oid::regclass, core.tag_name(c_kind),c_oid::regclass));
+	END IF;
+
+	IF count_rel <> -1 THEN
+		SELECT count(*) INTO count
+		FROM core.file_tree ft
+			JOIN core.file fl ON (ft.child_file_ptr=fl.file_id)
+		WHERE
+			ft.parent_file_ptr = p_parent_file_id AND
+			fl.file_kind = c_kind;
+
+		IF count >= count_rel THEN
+			PERFORM core._error('Forbidden', format('Wrong Child Count For Relation [(%s)%s->(%s)%s].',
+				core.tag_name(p_kind),p_oid::regclass, core.tag_name(c_kind),c_oid::regclass));
+			--PERFORM core._error('Forbidden', format('Wron Count of Child Files. Current count = %s.',
+			--	count));
+		END IF;
+	END IF;
+
+	SELECT count(*) INTO count
+	FROM core.file_tree ft
+		JOIN core.file fl ON (ft.child_file_ptr=fl.file_id)
+	WHERE
+		ft.parent_file_ptr = p_parent_file_id AND
+		fl.system_name = s_name;
+
+	IF count<>0 THEN
+		PERFORM core._error('DuplicateData', format('Child File with name "%s" allredy exists!',
+			s_name));
+	END IF;
+
+	PERFORM core.__inc_file_ref(p_child_file_id);
+END;
+$$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_create_file(
 	p_file_id bigint
@@ -174,6 +232,24 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
+CREATE  OR REPLACE FUNCTION _add_file_rel(
+	p_parent_table_oid oid,
+	p_parent_rec_kind_tag_name varchar(128),
+	p_child_table_oid oid,
+	p_child_rec_kind_tag_name varchar(128),
+	p_child_rec_count integer,
+	p_name varchar
+) RETURNS void AS $$
+BEGIN
+	PERFORM core._add_record_rel(1, p_parent_table_oid,
+		core.tag_id(2,p_parent_rec_kind_tag_name),
+		p_child_table_oid,
+		core.tag_id(2,p_child_rec_kind_tag_name),
+		p_child_rec_count, p_name
+	);
+END;
+$$ LANGUAGE plpgsql;
+
 /* -----------------------------------------------------------------------------
 	Создание дочерний ссылки на файл (через триггер у файла увеличивается счетчик
 	ref_counter на 1)
@@ -185,64 +261,7 @@ CREATE OR REPLACE FUNCTION insert_file(
 	p_color integer DEFAULT 0
 ) RETURNS void AS $$
 DECLARE
-	p_kind integer;
-	p_oid oid;
-	c_kind integer;
-	c_oid oid;
-	count integer;
-	count_rel integer;
-	s_name varchar;
 BEGIN
-	SELECT tableoid, file_kind INTO p_oid, p_kind
-	FROM core.file
-	WHERE
-		file_id = p_parent_file_id;
-	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Parent File "id=%s" is not found.',
-			p_parent_file_id));
-	END IF;
-
-	SELECT tableoid, file_kind, system_name INTO c_oid, c_kind, s_name
-	FROM core.file
-	WHERE
-		file_id = p_child_file_id;
-	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Child File "id=%s" is not found.',
-			p_child_file_id));
-	END IF;
-
-	count_rel := core._check_record_rel(1, p_oid, p_kind, c_oid, c_kind);
-	IF count_rel IS NULL THEN
-		PERFORM _error('Forbidden', format('File Relation [(%s)%s->(%s)%s] is forbidden.',
-			tag_name(p_kind),p_oid::regclass, tag_name(c_kind),c_oid::regclass));
-	END IF;
-
-	IF count_rel <> -1 THEN
-		SELECT count(*) INTO count
-		FROM core.file_tree ft
-			JOIN file fl ON (ft.child_file_ptr=fl.file_id)
-		WHERE
-			ft.parent_file_ptr = p_parent_file_id AND
-			fl.file_kind = c_kind;
-
-		IF count >= count_rel THEN
-			PERFORM core._error('Forbidden', format('Wron Count of Child Files. Current count = %s.',
-				count));
-		END IF;
-	END IF;
-
-	SELECT count(*) INTO count
-	FROM core.file_tree ft
-		JOIN file fl ON (ft.child_file_ptr=fl.file_id)
-	WHERE
-		ft.parent_file_ptr = p_parent_file_id AND
-		fl.system_name = s_name;
-
-	IF count<>0 THEN
-		PERFORM core._error('DuplicateData', format('Child File with name "%s" allredy exists!',
-			s_name));
-	END IF;
-
 	INSERT INTO core.file_tree
 	(
 		color, creator_id, parent_file_ptr, child_file_ptr
@@ -276,7 +295,7 @@ BEGIN
 	END IF;
 
 	SELECT count(*) INTO count
-	FROM file
+	FROM core.file
 	WHERE
 		file_id = p_child_file_id;
 	IF count = 0 THEN
@@ -284,7 +303,7 @@ BEGIN
 			p_child_file_id));
 	END IF;
 
-	DELETE FROM file_tree
+	DELETE FROM core.file_tree
 	WHERE
 		parent_file_ptr = p_parent_file_id AND
 		child_file_ptr = p_child_file_id;
@@ -306,7 +325,7 @@ DECLARE
 	kind_id bigint = core.tag_id(2, p_kind_tag_name);
 BEGIN
 	SELECT file_id INTO res_id
-	FROM file
+	FROM core.file
 	WHERE
 		file_kind = kind_id
 	LIMIT 1;
@@ -324,7 +343,7 @@ CREATE OR REPLACE FUNCTION child_file_id(
 )
 RETURNS bigint AS $$
 DECLARE
-	name varchar = canonical_string(p_system_name);
+	name varchar = core.canonical_string(p_system_name);
 	res_id bigint;
 	t_oid oid;
 BEGIN
@@ -386,7 +405,7 @@ BEGIN
 	ELSE
 		next_name := substr(p_path, 1, pos-1);
 		last_path := right(p_path, length(p_path)-pos);
-		res_id := core.child_file_id(p_root_file_id, next_name, p_type);
+		res_id := core.child_file_id(p_root_file_id, next_name);
 		IF res_id IS NOT NULL THEN
 			RETURN core.file_id(res_id, last_path, p_type);
 		ELSE

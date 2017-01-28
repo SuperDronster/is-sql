@@ -9,12 +9,25 @@ SET search_path TO "core";
 
 	Tag Group ID:
 		1 - Unit Names
-		2 - File Types
-			'resource-item-count'
+		2 - File Kinds
+			'default-resource'
+			'default-specification'
+			'rc-producer-connector',
+			'rc-consumer-connector',
+			'rc-connection-connector'
+			'rc-assoc-connector'
 		3 - Resource Layout Kinds
 			'item-range-node'
 			'item-range-data'
 		4 - Resource Layout Names
+		5 - Resource Sides Enum Names
+		6 - Resource Sides Enum Values
+		7 - Connector Group Types
+			'geometry-vertical-view'
+			'geometry-horisontal-view'
+			'item-range-connection'
+			'resource-connection'
+		8 - Specification Item Names
 
 ----------------------------------------------------------------------------- */
 
@@ -25,11 +38,33 @@ CREATE TABLE _record_rel(
 	child_table_oid oid NOT NULL,
 	child_rec_kind bigint NOT NULL,
 	child_rec_count integer NOT NULL DEFAULT (-1),
-	visual_name varchar DEFAULT NULL,
-	CONSTRAINT rec_relation_pk PRIMARY KEY (
+	visual_name varchar NOT NULL,
+	CONSTRAINT _record_rel_pkey PRIMARY KEY (
 		type,
 		parent_table_oid,parent_rec_kind,
 		child_table_oid,child_rec_kind)
+);
+
+CREATE SEQUENCE _dataref_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
+
+CREATE TABLE _data_type_def(
+	type_id integer NOT NULL,
+	type_role integer NOT NULL,
+	system_name varchar(128) NOT NULL,
+	visual_name varchar NOT NULL,
+	CONSTRAINT _type_def_pkey PRIMARY KEY (type_id)
+);
+
+CREATE UNIQUE INDEX _datatypedef_systemname_idx ON _data_type_def(system_name);
+
+CREATE TABLE _data_table_def(
+	type_ptr integer NOT NULL,
+	table_role integer NOT NULL,
+	table_oid oid NOT NULL,
+	CONSTRAINT _datatable_def_datatype_def_fk FOREIGN KEY (type_ptr)
+       REFERENCES _data_type_def(type_id) MATCH SIMPLE
+       ON UPDATE NO ACTION ON DELETE CASCADE,
+	CONSTRAINT _data_def_pkey PRIMARY KEY (type_ptr, table_oid)
 );
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
@@ -135,6 +170,7 @@ IMMUTABLE;
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION _add_record_rel(
 	p_type integer,
+	p_parent_table_oid oid,
 	p_parent_rec_kind bigint,
 	p_child_table_oid oid,
 	p_child_rec_kind bigint,
@@ -150,7 +186,8 @@ BEGIN
 	)
 	VALUES
 	(
-		p_type, p_parent_table_oid, p_parent_rec,
+		p_type,
+		p_parent_table_oid, p_parent_rec_kind,
 		p_child_table_oid, p_child_rec_kind,
 		p_child_rec_count, p_name
 	);

@@ -1,8 +1,7 @@
 ﻿/* -----------------------------------------------------------------------------
-	Resource File and System
+	Resource Layout
 	Constant:
-		_record_rel.type = 2 (Parent Resource Layout Node ->
-													Child Resource Layout Node)
+		_record_rel.type = 2 (Parent Rc Layout Node -> Child Rc Layout Node)
 		tag.group_id = 3 (Resource Layout Kinds)
 		tag.group_id = 4 (Resource Layout Names)
 ----------------------------------------------------------------------------- */
@@ -16,7 +15,7 @@ CREATE SEQUENCE rclayout_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 CREATE TABLE rc_layout(
 	layout_id bigint NOT NULL DEFAULT nextval('spec.rclayout_id_seq'),
 	parent_ptr bigint DEFAULT NULL,
-	resource_ptr bigint DEFAULT NULL,
+	resource_ptr bigint NOT NULL,
 	layout_kind bigint NOT NULL REFERENCES core.tag(id),
 	is_virtual boolean DEFAULT true,
 	name bigint NOT NULL REFERENCES core.tag(id),
@@ -24,13 +23,15 @@ CREATE TABLE rc_layout(
 	CONSTRAINT rc_layout_pkey PRIMARY KEY (layout_id)
 );
 
-CREATE INDEX rc_layout_rc_file_ptr_idx ON rc_layout(rc_file_ptr);
+CREATE INDEX rc_layout_resource_ptr_idx ON rc_layout(resource_ptr);
+CREATE INDEX rc_layout_parent_ptr_idx ON rc_layout(parent_ptr);
 
 -- Triggers
 
-CREATE OR REPLACE FUNCTION __on_create_rclayout_trigger() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION __on_create_rclayout_node_trigger() RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_create_rclayout(NEW.layout_id, NEW.resource_ptr, NEW.parent_ptr);
+	PERFORM spec.__on_create_rclayout(NEW.layout_id, NEW.resource_ptr,
+		NEW.parent_ptr, 'spec.rc_layout'::regclass, NEW.layout_kind);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -44,7 +45,7 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE TRIGGER create_rclayout_trigger
 	BEFORE INSERT ON rc_layout FOR EACH ROW
-	EXECUTE PROCEDURE __on_create_rclayout_trigger();
+	EXECUTE PROCEDURE __on_create_rclayout_node_trigger();
 
 CREATE TRIGGER delete_rclayout_trigger
 	BEFORE DELETE ON rc_layout FOR EACH ROW
@@ -58,42 +59,56 @@ CREATE TRIGGER delete_rclayout_trigger
 
 CREATE OR REPLACE FUNCTION __on_create_rclayout(
 	p_layout_id bigint,
-	p_resource_ptr bigint,
-	p_parent_ptr bigint
+	p_resource_id bigint,
+	p_parent_id bigint,
+	p_child_oid oid,
+	p_child_kind bigint
 ) RETURNS void AS $$
 DECLARE
+	p_kind integer;
+	p_oid oid;
+	c_kind integer;
+	c_oid oid;
 	count integer;
+	count_rel integer;
 BEGIN
+	-- Проверяем уникальность ИД
 	SELECT count(*) INTO count
 	FROM spec.rc_layout
 	WHERE
 		layout_id = p_layout_id;
-
 	IF count <> 0 THEN
 		PERFORM core._error('DuplicateData',
-			format('RC Layout "id=%s" allready exists.', p_layout_id));
+			format('Resource Layout "id=%s" allready exists.', p_layout_id));
 	END IF;
 
+	-- Проверяем есть ли Обьект - ресурс
 	SELECT count(*) INTO count
 	FROM spec.resource
 	WHERE
-		file_id = p_resource_ptr;
-
+		file_id = p_resource_id;
 	IF count <> 1 THEN
 		PERFORM core._error('DataIsNotFound',
-			format('Resource File "id=%s" is not found.', p_resource_ptr));
+			format('Resource File "id=%s" is not found.', p_resource_id));
 	END IF;
 
-	IF p_parent_ptr IS NOT NULL
+	IF p_parent_id IS NOT NULL
 	THEN
-		SELECT count(*) INTO count
+		-- Проверяем есть ли родительский объект
+		SELECT tableoid, layout_kind INTO p_oid, p_kind
 		FROM spec.rc_layout
 		WHERE
-			layout_id = p_parent_ptr;
-
-		IF count <> 1 THEN
+			layout_id = p_parent_id;
+		IF NOT FOUND THEN
 			PERFORM core._error('DataIsNotFound',
-				format('Parent Rc Layout "id=%s" is not found.', p_parent_ptr));
+				format('Parent Rc Layout "id=%s" is not found.',
+				p_parent_id));
+		END IF;
+
+		count_rel := core._check_record_rel(2, p_oid, p_kind, p_child_oid, p_child_kind);
+		IF count_rel IS NULL THEN
+			PERFORM core._error('Forbidden', format('Rc Layout Relation [(%s)%s->(%s)%s] is forbidden.',
+				core.tag_name(p_kind),p_oid::regclass, core.tag_name(p_child_kind),p_child_oid::regclass));
 		END IF;
 	END IF;
 END;
@@ -109,13 +124,31 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
+CREATE  OR REPLACE FUNCTION _add_rclayout_rel(
+	p_parent_table_oid oid,
+	p_parent_rec_kind_tag_name varchar(128),
+	p_child_table_oid oid,
+	p_child_rec_kind_tag_name varchar(128),
+	p_child_rec_count integer,
+	p_name varchar
+) RETURNS void AS $$
+BEGIN
+	PERFORM core._add_record_rel(2, p_parent_table_oid,
+		core.tag_id(3,p_parent_rec_kind_tag_name),
+		p_child_table_oid,
+		core.tag_id(3,p_child_rec_kind_tag_name),
+		p_child_rec_count, p_name
+	);
+END;
+$$ LANGUAGE plpgsql;
+
 /* -----------------------------------------------------------------------------
 	Создание записи раскладки ресурса диапазона кол-ва элементов
 ----------------------------------------------------------------------------- */
 CREATE OR REPLACE FUNCTION new_rc_layout_node(
 	p_layout_id bigint,
-  p_resource_ptr bigint,
-  p_parent_ptr bigint,
+  p_resource_id bigint,
+  p_parent_id bigint,
 	p_kind_tag_name varchar(128),
 	p_name_tag_name varchar(128),
 	p_color integer DEFAULT 0
@@ -137,7 +170,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_parent_ptr, p_resource_ptr, core.tag_id(3, p_kind_tag_name),
+		res_id, p_parent_id, p_resource_id, core.tag_id(3, p_kind_tag_name),
 		core.tag_id(4, p_name_tag_name), p_color, true
 	);
 
@@ -149,7 +182,7 @@ $$ LANGUAGE plpgsql;
 	Находит Rc Layout для Resource по строке пути
 ----------------------------------------------------------------------------- */
 CREATE OR REPLACE FUNCTION rc_layout(
-	p_resource_ptr bigint,
+	p_resource_id bigint,
 	p_path varchar,
 	p_type oid DEFAULT NULL
 ) RETURNS bigint AS $$
@@ -174,7 +207,7 @@ BEGIN
 	FROM spec.rc_layout
 	WHERE
 			name = name_id AND
-			resource_ptr = p_resource_ptr AND
+			resource_ptr = p_resource_id AND
 	  	parent_ptr IS NULL;
 
 	IF count > 1 THEN
@@ -188,14 +221,14 @@ BEGIN
 			FROM spec.rc_layout
 			WHERE
 					name = name_id AND
-					resource_ptr = p_resource_ptr AND
+					resource_ptr = p_resource_id AND
 			  	parent_ptr = prev_id;
 
 			IF curr_id IS NULL
 			THEN
 				PERFORM core._error('DataIsNotFound',
 					format('RC Layout "%s" For Resource "id=%s" is not found.',
-					curr_path, p_resource_ptr));
+					curr_path, p_resource_id));
 			END IF;
 			prev_id := curr_id;
 		END LOOP;
@@ -207,7 +240,7 @@ BEGIN
 	THEN
 		PERFORM core._error('DataIsNotFound',
 			format('RC Layout "%s" For Resource "id=%s" is not found.',
-			curr_path, p_resource_ptr));
+			curr_path, p_resource_id));
 	END IF;
 
 	RETURN prev_id;
