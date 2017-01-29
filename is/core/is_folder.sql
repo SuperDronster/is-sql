@@ -15,13 +15,29 @@ CREATE TABLE folder(
        ON UPDATE NO ACTION ON DELETE NO ACTION
 ) INHERITS(file);
 
-CREATE TRIGGER delete_folder_trigger
-	BEFORE DELETE ON folder FOR EACH ROW
-	EXECUTE PROCEDURE __on_delete_file_trigger();
+CREATE OR REPLACE FUNCTION __on_before_insert_folder_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM core.__on_before_insert_file(NEW.file_id);
+	RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER create_folder_trigger
+CREATE OR REPLACE FUNCTION __on_before_delete_folder_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM core.__on_before_delete_file(OLD.file_id, OLD.ref_counter);
+	RETURN OLD;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER before_delete_folder_trigger
+	BEFORE DELETE ON folder FOR EACH ROW
+	EXECUTE PROCEDURE __on_before_delete_folder_trigger();
+
+CREATE TRIGGER before_insert_folder_trigger
 	BEFORE INSERT ON folder FOR EACH ROW
-	EXECUTE PROCEDURE __on_create_file_trigger();
+	EXECUTE PROCEDURE __on_before_insert_folder_trigger();
 
 --------------------------------------------------------------------------------
 

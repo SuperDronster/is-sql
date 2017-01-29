@@ -26,19 +26,56 @@ CREATE TABLE connector(
 
 CREATE INDEX connector_systemname_idx ON connector(system_name);
 
-CREATE TRIGGER delete_connector_trigger
-	BEFORE DELETE ON connector FOR EACH ROW
-	EXECUTE PROCEDURE core.__on_delete_file_trigger();
+-- Triggers
 
-CREATE TRIGGER create_connector_trigger
+CREATE OR REPLACE FUNCTION __on_before_insert_connector_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_insert_connector(NEW.file_id);
+	RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_connector_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_connector(OLD.file_id,OLD.ref_counter);
+	RETURN OLD;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER before_delete_connector_trigger
+	BEFORE DELETE ON connector FOR EACH ROW
+	EXECUTE PROCEDURE __on_before_delete_connector_trigger();
+
+CREATE TRIGGER before_insert_connector_trigger
 	BEFORE INSERT ON connector FOR EACH ROW
-	EXECUTE PROCEDURE core.__on_create_file_trigger();
+	EXECUTE PROCEDURE __on_before_insert_connector_trigger();
 
 --------------------------------------------------------------------------------
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+
+CREATE OR REPLACE FUNCTION __on_before_insert_connector(
+	p_file_id bigint
+) RETURNS void AS $$
+DECLARE
+	count integer;
+BEGIN
+	PERFORM core.__on_before_insert_file(p_file_id);
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_connector(
+	p_file_id bigint,
+	p_ref_counter bigint
+) RETURNS void AS $$
+BEGIN
+	PERFORM core.__on_before_delete_file(p_file_id, p_ref_counter);
+END;
+$$ LANGUAGE 'plpgsql';
 
 /* -----------------------------------------------------------------------------
 	Создание файла - кол-ва ресурса
@@ -86,7 +123,7 @@ BEGIN
 	(
 		res_id, p_creator_id, core.tag_id(2, p_kind_tag_name), p_domen_name,
 		core.tag_id(7, p_group_type_tag_name), core.canonical_string(s_name),
-		v_name, p_is_packable, p_is_readonly, p_color		
+		v_name, p_is_packable, p_is_readonly, p_color
 	);
 
 	RETURN res_id;

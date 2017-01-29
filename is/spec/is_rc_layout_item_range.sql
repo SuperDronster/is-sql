@@ -31,27 +31,58 @@ CREATE TABLE rc_layout_item_range(
 CREATE INDEX rclayoutir_resource_ptr_idx ON rc_layout_item_range(resource_ptr);
 CREATE INDEX rclayoutir_parent_ptr_idx ON rc_layout_item_range(parent_ptr);
 
-CREATE OR REPLACE FUNCTION __on_create_rclayoutir_trigger() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION __on_before_insert_rclayoutir_trigger()
+RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_create_rclayout(NEW.layout_id, NEW.resource_ptr,
+	PERFORM spec.__on_before_insert_rclayoutir(NEW.layout_id, NEW.resource_ptr,
 		NEW.parent_ptr, 'rc_layout_item_range'::regclass, NEW.layout_kind);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER delete_rclayoutir_trigger
-	BEFORE DELETE ON rc_layout_item_range FOR EACH ROW
-	EXECUTE PROCEDURE spec.__on_delete_rclayout_trigger();
+CREATE OR REPLACE FUNCTION __on_before_delete_rclayoutir_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_rclayoutir(OLD.layout_id);
+	RETURN OLD;
+END;
+$$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER create_rclayoutir_trigger
+CREATE TRIGGER before_delete_rclayoutir_trigger
+	BEFORE DELETE ON rc_layout_item_range FOR EACH ROW
+	EXECUTE PROCEDURE __on_before_delete_rclayoutir_trigger();
+
+CREATE TRIGGER before_insert_rclayoutir_trigger
 	BEFORE INSERT ON rc_layout_item_range FOR EACH ROW
-	EXECUTE PROCEDURE spec.__on_create_rclayoutir_trigger();
+	EXECUTE PROCEDURE __on_before_insert_rclayoutir_trigger();
 
 --------------------------------------------------------------------------------
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+
+CREATE OR REPLACE FUNCTION __on_before_insert_rclayoutir(
+	p_layout_id bigint,
+	p_resource_id bigint,
+	p_parent_id bigint,
+	p_child_oid oid,
+	p_child_kind bigint
+) RETURNS void AS $$
+DECLARE
+BEGIN
+	PERFORM spec.__on_before_insert_rclayout(p_layout_id, p_resource_id,
+		p_parent_id, p_child_oid, p_child_kind);
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_rclayoutir(
+	p_layout_id bigint
+) RETURNS void AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_rclayout(p_layout_id);
+END;
+$$ LANGUAGE 'plpgsql';
 
 /* -----------------------------------------------------------------------------
 	Создание записи раскладки ресурса диапазона кол-ва элементов

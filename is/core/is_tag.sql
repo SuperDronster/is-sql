@@ -4,10 +4,6 @@
 
 SET search_path TO "core";
 
-/*DROP TABLE IF EXISTS
-	Tag
-CASCADE;*/
-
 --------------------------------------------------------------------------------
 
 CREATE SEQUENCE tag_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;

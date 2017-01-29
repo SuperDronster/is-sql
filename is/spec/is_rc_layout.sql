@@ -28,28 +28,30 @@ CREATE INDEX rc_layout_parent_ptr_idx ON rc_layout(parent_ptr);
 
 -- Triggers
 
-CREATE OR REPLACE FUNCTION __on_create_rclayout_node_trigger() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION __on_before_insert_rclayout_trigger()
+RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_create_rclayout(NEW.layout_id, NEW.resource_ptr,
+	PERFORM spec.__on_before_insert_rclayout(NEW.layout_id, NEW.resource_ptr,
 		NEW.parent_ptr, 'spec.rc_layout'::regclass, NEW.layout_kind);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE OR REPLACE FUNCTION __on_delete_rclayout_trigger() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION __on_before_delete_rclayout_trigger()
+RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_delete_rclayout(OLD.layout_id);
+	PERFORM spec.__on_before_delete_rclayout(OLD.layout_id);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER create_rclayout_trigger
+CREATE TRIGGER before_insert_rclayout_trigger
 	BEFORE INSERT ON rc_layout FOR EACH ROW
-	EXECUTE PROCEDURE __on_create_rclayout_node_trigger();
+	EXECUTE PROCEDURE __on_before_insert_rclayout_trigger();
 
-CREATE TRIGGER delete_rclayout_trigger
+CREATE TRIGGER before_delete_rclayout_trigger
 	BEFORE DELETE ON rc_layout FOR EACH ROW
-	EXECUTE PROCEDURE __on_delete_rclayout_trigger();
+	EXECUTE PROCEDURE __on_before_delete_rclayout_trigger();
 
 --------------------------------------------------------------------------------
 
@@ -57,7 +59,7 @@ CREATE TRIGGER delete_rclayout_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
-CREATE OR REPLACE FUNCTION __on_create_rclayout(
+CREATE OR REPLACE FUNCTION __on_before_insert_rclayout(
 	p_layout_id bigint,
 	p_resource_id bigint,
 	p_parent_id bigint,
@@ -105,16 +107,19 @@ BEGIN
 				p_parent_id));
 		END IF;
 
-		count_rel := core._check_record_rel(2, p_oid, p_kind, p_child_oid, p_child_kind);
+		count_rel := core._check_record_rel(2, p_oid, p_kind, p_child_oid,
+			p_child_kind);
 		IF count_rel IS NULL THEN
-			PERFORM core._error('Forbidden', format('Rc Layout Relation [(%s)%s->(%s)%s] is forbidden.',
-				core.tag_name(p_kind),p_oid::regclass, core.tag_name(p_child_kind),p_child_oid::regclass));
+			PERFORM core._error('Forbidden',
+				format('Rc Layout Relation [(%s)%s->(%s)%s] is forbidden.',
+				core.tag_name(p_kind),p_oid::regclass,
+				core.tag_name(p_child_kind),p_child_oid::regclass));
 		END IF;
 	END IF;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE OR REPLACE FUNCTION __on_delete_rclayout(
+CREATE OR REPLACE FUNCTION __on_before_delete_rclayout(
 	p_layout_id bigint
 ) RETURNS void AS $$
 BEGIN

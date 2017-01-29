@@ -6,20 +6,6 @@
 
 SET search_path TO "core";
 
-/*DROP TABLE IF EXISTS
-	Unit
-CASCADE;
-DROP SEQUENCE IF EXISTS
-	unit_id_seq
-CASCADE;
-DROP TYPE IF EXISTS
-	unit_info,
-	unit_value
-CASCADE;
-DROP CAST IF EXISTS
-	(unit_value AS varchar)
-CASCADE;*/
-
 --------------------------------------------------------------------------------
 
 CREATE TYPE unit_info AS
@@ -151,7 +137,9 @@ BEGIN
 		system_name = name;
 
 	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Unit "%s" is not found.', name));
+		PERFORM core._error('DataIsNotFound',
+			format('Unit "%s" is not found.',
+			name));
 	END IF;
 
 	RETURN res_id;
@@ -187,7 +175,8 @@ BEGIN
 			system_name = name;
 
 		IF NOT FOUND THEN
-			PERFORM _error('DataIsNotFound', format('Unit "%s" is not found.', name));
+			PERFORM _error('DataIsNotFound',
+				format('Unit "%s" is not found.', name));
 		END IF;
 		RETURN (res_id, p_value)::core.unit_value;
 	END IF;
@@ -206,13 +195,15 @@ DECLARE
 	name varchar := core.canonical_string(p_system_name);
 BEGIN
 	SELECT u1.id, u1.kind, u1.visual_name, u1.to_kf, u1.fr_kf, u2.id
-	INTO res.id, res.kind, res.visual_name, res.to_Kf, res.fr_Kf, res.basa_unit_ptr
+	INTO res.id, res.kind, res.visual_name, res.to_Kf, res.fr_Kf,
+		res.basa_unit_ptr
 	FROM core.unit u1 LEFT JOIN Unit u2 ON(u1.basa_unit_ptr=u2.id)
 	WHERE
 		u1.system_name = name;
 
 	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Source Unit "%s" is not found.',
+		PERFORM core._error('DataIsNotFound',
+			format('Source Unit "%s" is not found.',
 			name));
 	END IF;
 
@@ -231,13 +222,15 @@ DECLARE
 	name varchar;
 BEGIN
 	SELECT u1.id, u1.kind, u1.visual_name, u1.to_kf, u1.fr_kf, u2.id
-	INTO res.id, res.kind, res.visual_name, res.to_Kf, res.fr_Kf, res.basa_unit_ptr
+	INTO res.id, res.kind, res.visual_name, res.to_Kf, res.fr_Kf,
+		res.basa_unit_ptr
 	FROM core.unit u1 LEFT JOIN Unit u2 ON(u1.basa_unit_ptr=u2.id)
 	WHERE
 		u1.id = p_unit_id;
 
 	IF NOT FOUND THEN
-		PERFORM core._error('DataIsNotFound', format('Source Unit "id=%s" is not found.',
+		PERFORM core._error('DataIsNotFound',
+			format('Source Unit "id=%s" is not found.',
 			p_unit_id));
 	END IF;
 

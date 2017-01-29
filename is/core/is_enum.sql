@@ -4,16 +4,12 @@
 
 SET search_path TO "core";
 
-/*DROP TABLE IF EXISTS
-	enum_value
-CASCADE;*/
-
 --------------------------------------------------------------------------------
 
 CREATE TABLE enum_value
 (
-	enum_id bigint NOT NULL REFERENCES Tag(id),
-	value_id bigint NOT NULL REFERENCES Tag(id),
+	enum_id bigint NOT NULL REFERENCES tag(id),
+	value_id bigint NOT NULL REFERENCES tag(id),
 	CONSTRAINT enum_value_pkey PRIMARY KEY (enum_id, value_id)
 );
 
@@ -89,7 +85,8 @@ BEGIN
 		value_id = p_value_id;
 
 	IF res = 0 THEN
-		PERFORM core._error('DataIsNotFound', format('Enum Value "%s.%s" is not defined.',
+		PERFORM core._error('DataIsNotFound',
+			format('Enum Value "%s.%s" is not defined.',
 			p_enum_id, p_value_tag_name));
 	END IF;
 	RETURN p_value_id;

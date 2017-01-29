@@ -24,26 +24,45 @@ CREATE INDEX specification_systemname_idx ON specification(system_name);
 
 -- Triggers
 
-CREATE OR REPLACE FUNCTION __on_delete_specification_trigger() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION __on_before_insert_specification_trigger()
+RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_delete_specification(OLD.file_id,OLD.ref_counter);
+	PERFORM spec.__on_before_insert_specification(NEW.file_id);
+	RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_specification_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_specification(OLD.file_id,OLD.ref_counter);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER delete_specification_trigger
-	BEFORE DELETE ON specification FOR EACH ROW
-	EXECUTE PROCEDURE __on_delete_specification_trigger();
-
-CREATE TRIGGER create_specification_trigger
+CREATE TRIGGER before_insert_specification_trigger
 	BEFORE INSERT ON specification FOR EACH ROW
-	EXECUTE PROCEDURE core.__on_create_file_trigger();
+	EXECUTE PROCEDURE __on_before_insert_specification_trigger();
+
+CREATE TRIGGER before_delete_specification_trigger
+	BEFORE DELETE ON specification FOR EACH ROW
+	EXECUTE PROCEDURE __on_before_delete_specification_trigger();
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
-CREATE OR REPLACE FUNCTION __on_delete_specification(
+CREATE OR REPLACE FUNCTION __on_before_insert_specification(
+	p_file_id bigint
+) RETURNS void AS $$
+DECLARE
+	count integer;
+BEGIN
+	PERFORM core.__on_before_insert_file(p_file_id);
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_specification(
 	p_file_id bigint,
 	p_ref_counter bigint
 ) RETURNS void AS $$

@@ -28,6 +28,7 @@ SET search_path TO "core";
 			'item-range-connection'
 			'resource-connection'
 		8 - Specification Item Names
+		9 - Specification Item Kinds
 
 ----------------------------------------------------------------------------- */
 

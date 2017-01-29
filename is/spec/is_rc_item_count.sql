@@ -21,22 +21,57 @@ CREATE TABLE rc_item_count(
 	CONSTRAINT rcitemcount_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION
-
 ) INHERITS(resource);
 
-CREATE TRIGGER delete_rcitemcount_trigger
-	BEFORE DELETE ON rc_item_count FOR EACH ROW
-	EXECUTE PROCEDURE __on_delete_resource_trigger();
+-- Triggers
 
-CREATE TRIGGER create_rcitemcount_trigger
+CREATE OR REPLACE FUNCTION __on_before_insert_rcitemcount_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_insert_rcitemcount(NEW.file_id);
+	RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_rcitemcount_trigger()
+RETURNS trigger AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_rcitemcount(OLD.file_id,OLD.ref_counter);
+	RETURN OLD;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER before_insert_rcitemcount_trigger
 	BEFORE INSERT ON rc_item_count FOR EACH ROW
-	EXECUTE PROCEDURE core.__on_create_file_trigger();
+	EXECUTE PROCEDURE __on_before_insert_rcitemcount_trigger();
+CREATE TRIGGER before_delete_rcitemcount_trigger
+	BEFORE DELETE ON rc_item_count FOR EACH ROW
+	EXECUTE PROCEDURE __on_before_delete_rcitemcount_trigger();
 
 --------------------------------------------------------------------------------
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+
+CREATE OR REPLACE FUNCTION __on_before_insert_rcitemcount(
+	p_file_id bigint
+) RETURNS void AS $$
+DECLARE
+	count integer;
+BEGIN
+	PERFORM spec.__on_before_insert_resource(p_file_id);
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __on_before_delete_rcitemcount(
+	p_file_id bigint,
+	p_ref_counter bigint
+) RETURNS void AS $$
+BEGIN
+	PERFORM spec.__on_before_delete_resource(p_file_id,p_ref_counter);
+END;
+$$ LANGUAGE 'plpgsql';
 
 /* -----------------------------------------------------------------------------
 	Создание файла - кол-ва ресурса

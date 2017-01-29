@@ -18,25 +18,21 @@ CREATE TABLE resource(
 
 --------------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION __on_delete_resource_trigger() RETURNS trigger AS $$
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
+
+CREATE OR REPLACE FUNCTION __on_before_insert_resource(
+	p_file_id bigint
+) RETURNS void AS $$
+DECLARE
+	count integer;
 BEGIN
-	PERFORM spec.__on_delete_resource(OLD.file_id,OLD.ref_counter);
-	RETURN OLD;
+	PERFORM core.__on_before_insert_file(p_file_id);
 END;
 $$ LANGUAGE 'plpgsql';
 
-/*CREATE OR REPLACE FUNCTION __on_create_resource_trigger() RETURNS trigger AS $$
-BEGIN
-	PERFORM core.__on_create_file(NEW.file_id);
-	RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';*/
-
--- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
--- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
--- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
-
-CREATE OR REPLACE FUNCTION __on_delete_resource(
+CREATE OR REPLACE FUNCTION __on_before_delete_resource(
 	p_file_id bigint,
 	p_ref_counter bigint
 ) RETURNS void AS $$
@@ -46,6 +42,6 @@ BEGIN
 		resource_ptr = p_file_id AND
 		parent_ptr IS NULL;
 
-	PERFORM core.__on_delete_file(p_file_id, p_ref_counter);
+	PERFORM core.__on_before_delete_file(p_file_id, p_ref_counter);
 END;
 $$ LANGUAGE 'plpgsql';
