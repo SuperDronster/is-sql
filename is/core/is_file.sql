@@ -2,7 +2,6 @@
 	File Functions.
 	Constant:
 		_record_rel.type = 1 (Parent File -> Chld File Relation)
-		tag.group_id = 2 (File Type Tags)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "core";
@@ -13,7 +12,7 @@ CREATE SEQUENCE file_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
 CREATE TABLE file(
 	file_id bigint NOT NULL,
-	file_kind bigint NOT NULL REFERENCES Tag(id),
+	file_kind bigint NOT NULL REFERENCES tag(id),
 	color integer NOT NULL DEFAULT 0,
 	create_time timestamp NOT NULL DEFAULT now(),
 	creator_id integer NOT NULL DEFAULT 0,

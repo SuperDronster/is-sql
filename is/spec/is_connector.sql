@@ -1,23 +1,33 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource File and System
 	Constant.
-		tag.group_id = 2 (File Kind Tags)
-		tag.group_id = 7 (Connector Data Types)
 
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
+SELECT core.new_pool(NULL, 'file-kind','connector', 'Connector File Kinds.',0);
+SELECT core.new_tag('file-kind','connector', NULL, 'rc-producer', 'Producer');
+SELECT core.new_tag('file-kind','connector', NULL, 'rc-consumer', 'Consumer');
+SELECT core.new_tag('file-kind','connector', NULL, 'rc-connection', 'Connection');
+SELECT core.new_tag('file-kind','connector', NULL, 'rc-assoc', 'Assoc');
 
-SELECT core.new_tag(2,NULL, 'rc-producer-connector', 'Resource Producer Connector File.');
-SELECT core.new_tag(2,NULL, 'rc-consumer-connector', 'Resource Consumer Connector File.');
-SELECT core.new_tag(2,NULL, 'rc-connection-connector', 'Resource Connection Connector File.');
-SELECT core.new_tag(2,NULL, 'rc-assoc-connector', 'Resource Assoc Connector File.');
+SELECT core.new_pool(NULL, 'connector','group-type', 'Connector Group Types.',0);
+SELECT core.new_tag('connector','group-type', NULL, 'geometry-vertical-view',
+	'Geometry Vertical View');
+SELECT core.new_tag('connector','group-type', NULL, 'geometry-horisontal-view',
+	'Geometry Horisontal View');
+SELECT core.new_tag('connector','group-type', NULL, 'item-range-connection',
+	'Item Range Connection');
+SELECT core.new_tag('connector','group-type', NULL, 'resource-connection',
+	'Resource Connection');
 
 CREATE TABLE connector(
 	group_type bigint NOT NULL REFERENCES core.tag(id),
 	domen_name varchar NOT NULL,
+
+	-- Нельзя удалять тег - вид файла
 	CONSTRAINT connector_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
@@ -121,9 +131,9 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id(2, p_kind_tag_name), p_domen_name,
-		core.tag_id(7, p_group_type_tag_name), core.canonical_string(s_name),
-		v_name, p_is_packable, p_is_readonly, p_color
+		res_id, p_creator_id, core.tag_id('file-kind','connector', p_kind_tag_name),
+		p_domen_name, core.tag_id('connector','group-type', p_group_type_tag_name),
+		core.canonical_string(s_name), v_name, p_is_packable, p_is_readonly, p_color
 	);
 
 	RETURN res_id;

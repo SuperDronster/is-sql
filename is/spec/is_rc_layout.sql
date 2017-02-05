@@ -2,13 +2,15 @@
 	Resource Layout
 	Constant:
 		_record_rel.type = 2 (Parent Rc Layout Node -> Child Rc Layout Node)
-		tag.group_id = 3 (Resource Layout Kinds)
-		tag.group_id = 4 (Resource Layout Names)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
+
+SELECT core.new_pool(NULL, 'names', 'rc-layout', 'Resource Layout Names.', 0);
+SELECT core.new_pool(NULL, 'node-kind', 'rc-layout', 'Resource Layout Nodes.', 0);
+
 
 CREATE SEQUENCE rclayout_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
@@ -139,9 +141,9 @@ CREATE  OR REPLACE FUNCTION _add_rclayout_rel(
 ) RETURNS void AS $$
 BEGIN
 	PERFORM core._add_record_rel(2, p_parent_table_oid,
-		core.tag_id(3,p_parent_rec_kind_tag_name),
+		core.tag_id('node-kind','rc-layout', p_parent_rec_kind_tag_name),
 		p_child_table_oid,
-		core.tag_id(3,p_child_rec_kind_tag_name),
+		core.tag_id('node-kind','rc-layout', p_child_rec_kind_tag_name),
 		p_child_rec_count, p_name
 	);
 END;
@@ -175,8 +177,10 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_parent_id, p_resource_id, core.tag_id(3, p_kind_tag_name),
-		core.tag_id(4, p_name_tag_name), p_color, true
+		res_id, p_parent_id, p_resource_id,
+		core.tag_id('node-kind','rc-layout', p_kind_tag_name),
+		core.tag_id('names','rc-layout', p_name_tag_name), p_color,
+		true
 	);
 
 	RETURN res_id;
@@ -205,7 +209,7 @@ BEGIN
 	count := array_length(names,1);
 
 	curr_path := names[1];
-	name_id := core.tag_id(4,names[1]);
+	name_id := core.tag_id('names','rc-layout', names[1]);
 
 	SELECT layout_id, tableoid
 	INTO prev_id, a_type
@@ -219,7 +223,7 @@ BEGIN
 		FOR i IN 2..count
 		LOOP
 			curr_path := curr_path || '/' || names[i];
-			name_id := core.tag_id(4,names[i]);
+			name_id := core.tag_id('names','rc-layout', names[i]);
 
 			SELECT layout_id, tableoid
 			INTO curr_id, a_type

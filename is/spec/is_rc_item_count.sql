@@ -1,8 +1,6 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource Count File
 	Constant:
-		tag.group_id = 2 (File Type Tags)
-		tag.group_id = 5 (Resource Sides Enum Names)
 ---------------------------------------------------------------------------- */
 
 SET search_path TO "spec";
@@ -12,12 +10,18 @@ SET search_path TO "spec";
 CREATE TABLE rc_item_count(
 	rc_value_count integer,
 	CONSTRAINT rcitemcount_pkey PRIMARY KEY (file_id),
-	CONSTRAINT rcitemcount_rcdatatype_fk FOREIGN KEY (rc_data_type)
-		REFERENCES core._data_type_def(type_id) MATCH SIMPLE
+
+	-- Нельзя удалять тип данных ресурса
+	CONSTRAINT rcitemcount_rcdatatype_fk FOREIGN KEY (data_type_ptr)
+		REFERENCES rc_data_type(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
+
+	-- Нельзя удалять пул тегов - сторон ресурса
 	CONSTRAINT rcitemcount_rcsides_fk FOREIGN KEY (rc_sides)
-		REFERENCES core.tag(id) MATCH SIMPLE
+		REFERENCES core.pool(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
+
+	-- Нельзя удалять вид файла - ресурса
 	CONSTRAINT rcitemcount_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION
@@ -79,9 +83,9 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION new_rc_item_count(
 	p_id bigint,
 	p_creator_id integer,
-	p_rc_data_type integer,
+	p_data_type_id integer,
 	p_value_count integer,
-	p_sides_tag_name varchar(128),
+	p_sides_pool_name varchar(128),
 	p_system_name varchar(128),
 	p_visual_name varchar DEFAULT NULL,
 	p_color integer DEFAULT 0,
@@ -106,14 +110,16 @@ BEGIN
 
 	INSERT INTO spec.rc_item_count
 	(
-		file_id, creator_id, rc_data_type, file_kind, system_name, visual_name,
+		file_id, creator_id, data_type_ptr, file_kind, system_name, visual_name,
 		is_packable, is_readonly, color, rc_sides, rc_value_count
 	)
 	VALUES
 	(
-		res_id, p_creator_id, p_rc_data_type, core.tag_id(2, 'default-resource'),
-    core.canonical_string(p_system_name), name, p_is_packable, p_is_readonly,
-    p_color, core.tag_id(5, p_sides_tag_name), p_value_count
+		res_id, p_creator_id, p_data_type_id,
+		core.tag_id('file-kind','resource', 'standard'),
+    core.canonical_string(p_system_name), name, p_is_packable,
+		p_is_readonly, p_color, core.pool_id('rc-sides', p_sides_pool_name),
+		p_value_count
 	);
 
 	RETURN res_id;

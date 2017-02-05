@@ -1,18 +1,21 @@
 ﻿/* -----------------------------------------------------------------------------
 	Folder Functions.
 	Constant.
-		tag.group_id = 2 (File Kind Tags)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "core";
 
 --------------------------------------------------------------------------------
 
+SELECT new_pool(NULL, 'file-kind', 'folder', 'Folder Kinds.', 0);
+
 CREATE TABLE folder(
 	CONSTRAINT folder_pkey PRIMARY KEY (file_id),
+
+	-- Нельзя удалять тег - вид файла
 	CONSTRAINT folder_filekind_fk FOREIGN KEY (file_kind)
-       REFERENCES tag(id) MATCH SIMPLE
-       ON UPDATE NO ACTION ON DELETE NO ACTION
+		REFERENCES tag(id) MATCH SIMPLE
+		ON UPDATE NO ACTION ON DELETE NO ACTION
 ) INHERITS(file);
 
 CREATE OR REPLACE FUNCTION __on_before_insert_folder_trigger()
@@ -81,7 +84,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id(2, p_kind_tag_name),
+		res_id, p_creator_id, core.tag_id('file-kind','folder', p_kind_tag_name),
 		core.canonical_string(p_system_name), name, p_is_packable,
 		p_is_readonly, p_color
 	);

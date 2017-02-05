@@ -8,6 +8,12 @@ SET search_path TO "core";
 
 --------------------------------------------------------------------------------
 
+SELECT core.new_pool(NULL, 'measure', 'geography', 'Geography Units.', 0);
+SELECT core.new_pool(NULL, 'measure', 'geometry', 'Geometry Units.', 1);
+SELECT core.new_pool(NULL, 'measure', 'distance', 'Distance Units.', 2);
+SELECT core.new_pool(NULL, 'measure', 'physical-massa', 'Physical Massa Units.', 3);
+SELECT core.new_pool(NULL, 'measure', 'information', 'Information Units.', 4);
+
 CREATE TYPE unit_info AS
 (
 	id integer,
@@ -86,6 +92,7 @@ CREATE CAST (unit_value AS varchar)
 ----------------------------------------------------------------------------- */
 CREATE  OR REPLACE FUNCTION new_unit(
 	p_id integer,
+	p_group_tag_name varchar(128),
 	p_kind_tag_name varchar(128),
 	p_system_name varchar(24),
 	p_visual_name varchar,
@@ -112,9 +119,10 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, core.tag_id(1,p_kind_tag_name), p_order_index, p_basa_unit_ptr,
-		core.canonical_string(p_system_name), p_visual_name, p_to_kf, p_fr_kf,
-		p_format_number_string, p_format_result_string
+		res_id, core.tag_id('measure',p_group_tag_name,p_kind_tag_name),
+		p_order_index, p_basa_unit_ptr, core.canonical_string(p_system_name),
+		p_visual_name, p_to_kf, p_fr_kf, p_format_number_string,
+		p_format_result_string
 	);
 
 	RETURN res_id;

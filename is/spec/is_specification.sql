@@ -1,8 +1,6 @@
 ﻿/* -----------------------------------------------------------------------------
 	Resource File and System
 	Constant.
-		tag.group_id = 2 (File Kind Tags)
-		tag.group_id = 7 (specification Data Types)
 
 ----------------------------------------------------------------------------- */
 
@@ -10,10 +8,15 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_tag(2,NULL, 'default-specification', 'Default Specification File.');
+SELECT core.new_pool(NULL, 'file-kind','specification',
+	'Specification File Kinds.', 0);
+SELECT core.new_tag('file-kind','specification', NULL, 'standard',
+	'Standard Specification');
 
 CREATE TABLE specification(
 	dependency_flags integer DEFAULT 0,
+
+	-- Нельзя удалять тег - вид файла
 	CONSTRAINT specification_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
@@ -114,7 +117,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id(2, 'default-specification'),
+		res_id, p_creator_id, core.tag_id('file-kind','specification', 'standard'),
 		0, core.canonical_string(p_system_name), v_name, p_is_packable,
 		p_is_readonly, p_color
 	);
