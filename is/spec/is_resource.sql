@@ -8,10 +8,12 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_pool(NULL, 'file-kind','resource',
-	'Resource File Kinds.', 0);
-SELECT core.new_tag('file-kind','resource', NULL, 'standard',
-	'Standard Resource');
+SELECT core.new_tag('file','kind', NULL, 'resource-folder-root',
+	'Resource Folder Root');
+SELECT core.new_tag('file','kind', NULL, 'resource-folder-node',
+	'Resource Folder Node');
+
+SELECT core.new_tag('file','kind', NULL, 'std-resource', 'Standard Resource');
 
 CREATE SEQUENCE rcdatatype_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 

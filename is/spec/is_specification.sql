@@ -8,9 +8,12 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_pool(NULL, 'file-kind','specification',
-	'Specification File Kinds.', 0);
-SELECT core.new_tag('file-kind','specification', NULL, 'standard',
+SELECT core.new_tag('file','kind', NULL, 'specification-folder-root',
+	'Specification Folder Root');
+SELECT core.new_tag('file','kind', NULL, 'specification-folder-node',
+	'Specification Folder Node');
+
+SELECT core.new_tag('file','kind', NULL, 'std-specification',
 	'Standard Specification');
 
 CREATE TABLE specification(
@@ -70,12 +73,16 @@ CREATE OR REPLACE FUNCTION __on_before_delete_specification(
 	p_ref_counter bigint
 ) RETURNS void AS $$
 BEGIN
-	DELETE FROM spec.spec_item
+	DELETE FROM spec.part_dep
+	WHERE
+		specification_ptr = p_file_id;
+
+	DELETE FROM spec.part
 	WHERE
 		specification_ptr = p_file_id AND
 		parent_ptr IS NULL;
 
-	PERFORM core.__on_delete_file(p_file_id, p_ref_counter);
+	PERFORM core.__on_before_delete_file(p_file_id, p_ref_counter);
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -117,7 +124,7 @@ BEGIN
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id('file-kind','specification', 'standard'),
+		res_id, p_creator_id, core.tag_id('file','kind', 'std-specification'),
 		0, core.canonical_string(p_system_name), v_name, p_is_packable,
 		p_is_readonly, p_color
 	);

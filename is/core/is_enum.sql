@@ -8,9 +8,16 @@ SET search_path TO "core";
 
 CREATE TABLE enum_value
 (
-	enum_id bigint NOT NULL REFERENCES tag(id),
-	value_id bigint NOT NULL REFERENCES tag(id),
-	CONSTRAINT enum_value_pkey PRIMARY KEY (enum_id, value_id)
+	pool_ptr integer NOT NULL,
+	value_key integer NOT NULL,
+	visual_name varchar NOT NULL,
+
+	-- Удалять все ключи при удалении пула - перечисления
+	CONSTRAINT enumvalue_del_fk FOREIGN KEY (pool_ptr)
+		REFERENCES pool(id) MATCH SIMPLE
+		ON UPDATE NO ACTION ON DELETE CASCADE,
+
+	CONSTRAINT enumvalue_pkey PRIMARY KEY (pool_ptr, value_key)
 );
 
 --------------------------------------------------------------------------------
@@ -22,89 +29,59 @@ CREATE TABLE enum_value
 /* -----------------------------------------------------------------------------
 	Создает значение перечисления
 ----------------------------------------------------------------------------- */
-CREATE  OR REPLACE FUNCTION new_enum_value(
-	p_enum_type integer,
-	p_enum_tag_name varchar(128),
-	p_value_type integer,
-	p_value_tag_name varchar(128)
+CREATE  OR REPLACE FUNCTION new_enum_value
+(
+	p_role_key varchar(32),
+	p_pool_key varchar(32),
+	p_value_key integer,
+	p_visual_name varchar
 ) RETURNS void AS $$
-DECLARE
 BEGIN
 	INSERT INTO core.enum_value
 	(
-		enum_id, value_id
+		pool_ptr, value_key, visual_name
 	)
 	VALUES
 	(
-		core.tag_id(p_enum_type, p_enum_tag_name),
-		core.tag_id(p_value_type, p_value_tag_name)
+		core.pool_id(p_role_key, p_pool_key),
+		p_value_key, p_visual_name
+	);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE  OR REPLACE FUNCTION new_enum_value
+(
+	p_pool_id integer,
+	p_value_key integer,
+	p_visual_name varchar
+) RETURNS void AS $$
+BEGIN
+	INSERT INTO core.enum_value
+	(
+		pool_ptr, value_key, visual_name
+	)
+	VALUES
+	(
+		p_pool_id, p_value_key, p_visual_name
 	);
 END;
 $$ LANGUAGE plpgsql;
 
 /* -----------------------------------------------------------------------------
-	Удаляет значение перечисления
+	Возвращает наименование ключа перечисления
 ----------------------------------------------------------------------------- */
-CREATE  OR REPLACE FUNCTION del_enum_value(
-	p_enum_type integer,
-	p_enum_tag_name varchar(128),
-	p_value_type integer,
-	p_value_tag_name varchar(128)
-) RETURNS boolean AS $$
+CREATE  OR REPLACE FUNCTION enum_value_name(
+	p_pool_id integer,
+	p_value_key integer
+) RETURNS varchar AS $$
 DECLARE
- count integer;
- e_id bigint := core.tag_id(p_enum_type, p_enum_tag_name);
- v_id bigint := core.tag_id(p_value_type, p_value_tag_name);
-BEGIN
-	DELETE FROM enum_value
-	WHERE
-		enum_id = e_id AND
-		value_id = v_id;
-	GET DIAGNOSTICS count = ROW_COUNT;
-
-	RETURN count <> 0;
-END;
-$$ LANGUAGE plpgsql;
-
-/* -----------------------------------------------------------------------------
-	Возвращает ид записи тега, соответствующего значению перечисления
------------------------------------------------------------------------------ */
-CREATE  OR REPLACE FUNCTION enum_value_id(
-	p_enum_id bigint,
-	p_value_type integer,
-	p_value_tag_name varchar(128)
-) RETURNS bigint AS $$
-DECLARE
-	p_value_id bigint := core.tag_id(p_value_type, p_value_tag_name);
 	res integer;
 BEGIN
-	SELECT count(*) INTO res
-	FROM enum_value
-	WHERE
-	 	enum_id = p_enum_id AND
-		value_id = p_value_id;
-
-	IF res = 0 THEN
-		PERFORM core._error('DataIsNotFound',
-			format('Enum Value "%s.%s" is not defined.',
-			p_enum_id, p_value_tag_name));
-	END IF;
-	RETURN p_value_id;
-END;
-$$ LANGUAGE plpgsql;
-
-/* -----------------------------------------------------------------------------
-	Возвращает ид записи тега, соответствующего значению перечисления
------------------------------------------------------------------------------ */
-CREATE  OR REPLACE FUNCTION enum_value_id(
-	p_enum_type integer,
-	p_enum_tag_name varchar(128),
-	p_value_type integer,
-	p_value_tag_name varchar(128)
-) RETURNS bigint AS $$
-DECLARE
-BEGIN
-	RETURN core.enum_value_id(core.tag_id(p_enum_type, p_enum_tag_name),
-		p_value_type, p_value_tag_name);
+	RETURN
+		(SELECT visual_name
+		FROM core.enum_value
+		WHERE
+		 	pool_ptr = p_pool_id AND
+			value_key = p_value_key);
 END;
 $$ LANGUAGE plpgsql;

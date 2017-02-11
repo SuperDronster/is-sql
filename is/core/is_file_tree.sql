@@ -35,7 +35,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION __on_after_delete_filetree_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM core.___on_after_delete_filetree(OLD.child_file_ptr);
+	PERFORM core.__on_after_delete_filetree(OLD.child_file_ptr);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -146,20 +146,18 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE  OR REPLACE FUNCTION _add_file_rel(
 	p_parent_table_oid oid,
-	p_parent_rec_group_tag_name varchar(128),
+	--p_parent_rec_group_tag_name varchar(128),
 	p_parent_rec_kind_tag_name varchar(128),
 	p_child_table_oid oid,
-	p_child_rec_group_tag_name varchar(128),
+	--p_child_rec_group_tag_name varchar(128),
 	p_child_rec_kind_tag_name varchar(128),
 	p_child_rec_count integer,
 	p_name varchar
 ) RETURNS void AS $$
 BEGIN
 	PERFORM core._add_record_rel(1, p_parent_table_oid,
-		core.tag_id('file-kind',p_parent_rec_group_tag_name,
-			p_parent_rec_kind_tag_name), p_child_table_oid,
-		core.tag_id('file-kind',p_child_rec_group_tag_name,
-			p_child_rec_kind_tag_name), p_child_rec_count,
+		core.tag_id('file','kind', p_parent_rec_kind_tag_name), p_child_table_oid,
+		core.tag_id('file','kind', p_child_rec_kind_tag_name), p_child_rec_count,
 		p_name
 	);
 END;
@@ -240,7 +238,7 @@ CREATE OR REPLACE FUNCTION root_file_id(
 ) RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
-	kind_id bigint = core.tag_id('file-kind','folder', p_kind_tag_name);
+	kind_id bigint = core.tag_id('file','kind', p_kind_tag_name);
 BEGIN
 	SELECT file_id INTO res_id
 	FROM core.file

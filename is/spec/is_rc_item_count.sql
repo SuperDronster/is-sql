@@ -7,6 +7,9 @@ SET search_path TO "spec";
 
 -------------------------------------------------------------------------------
 
+SELECT core.new_tag('file','kind', NULL, 'item-count-resource',
+	'Item Count Resource');
+
 CREATE TABLE rc_item_count(
 	rc_value_count integer,
 	CONSTRAINT rcitemcount_pkey PRIMARY KEY (file_id),
@@ -116,7 +119,7 @@ BEGIN
 	VALUES
 	(
 		res_id, p_creator_id, p_data_type_id,
-		core.tag_id('file-kind','resource', 'standard'),
+		core.tag_id('file','kind', 'item-count-resource'),
     core.canonical_string(p_system_name), name, p_is_packable,
 		p_is_readonly, p_color, core.pool_id('rc-sides', p_sides_pool_name),
 		p_value_count

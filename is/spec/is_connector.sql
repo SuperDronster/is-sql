@@ -7,11 +7,25 @@
 SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
-SELECT core.new_pool(NULL, 'file-kind','connector', 'Connector File Kinds.',0);
-SELECT core.new_tag('file-kind','connector', NULL, 'rc-producer', 'Producer');
-SELECT core.new_tag('file-kind','connector', NULL, 'rc-consumer', 'Consumer');
-SELECT core.new_tag('file-kind','connector', NULL, 'rc-connection', 'Connection');
-SELECT core.new_tag('file-kind','connector', NULL, 'rc-assoc', 'Assoc');
+
+SELECT core.new_tag('file','kind', NULL, 'connector-folder-root',
+	'Connector Folder Root');
+SELECT core.new_tag('file','kind', NULL, 'connector-folder-node',
+	'Connector Folder Node');
+
+SELECT core.new_tag('file','kind', NULL, 'resource-producer-connector-folder', 'Producer');
+SELECT core.new_tag('file','kind', NULL, 'resource-consumer-connector-folder', 'Consumer');
+SELECT core.new_tag('file','kind', NULL, 'node-connection-connector-folder', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'edge-connection-connector-folder', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'network-connection-connector-folder', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'association-connector-folder', 'Association');
+
+SELECT core.new_tag('file','kind', NULL, 'resource-producer-connector', 'Producer');
+SELECT core.new_tag('file','kind', NULL, 'resource-consumer-connector', 'Consumer');
+SELECT core.new_tag('file','kind', NULL, 'node-connection-connector', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'edge-connection-connector', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'network-connection-connector', 'Connection');
+SELECT core.new_tag('file','kind', NULL, 'association-connector', 'Association');
 
 SELECT core.new_pool(NULL, 'connector','group-type', 'Connector Group Types.',0);
 SELECT core.new_tag('connector','group-type', NULL, 'geometry-vertical-view',
@@ -23,8 +37,15 @@ SELECT core.new_tag('connector','group-type', NULL, 'item-range-connection',
 SELECT core.new_tag('connector','group-type', NULL, 'resource-connection',
 	'Resource Connection');
 
+SELECT core.new_pool(NULL, 'connector','rc-rel-type', 'Resource Relation Types.',0);
+SELECT core.new_tag('connector','rc-rel-type', NULL, '>=', 'Bigger and Equals');
+SELECT core.new_tag('connector','rc-rel-type', NULL, '<=', 'Litlle and Equals');
+SELECT core.new_tag('connector','rc-rel-type', NULL, '==', 'Equals');
+SELECT core.new_tag('connector','rc-rel-type', NULL, 'any', 'Any');
+
 CREATE TABLE connector(
 	group_type bigint NOT NULL REFERENCES core.tag(id),
+	rc_rel_type bigint NOT NULL REFERENCES core.tag(id),
 	domen_name varchar NOT NULL,
 
 	-- Нельзя удалять тег - вид файла
@@ -94,6 +115,7 @@ CREATE OR REPLACE FUNCTION new_connector(
 	p_id bigint,
 	p_creator_id integer,
 	p_kind_tag_name varchar(128),
+	p_rcreltype_tag_name varchar(128),
 	p_domen_name varchar,
 	p_group_type_tag_name varchar(128),
 	p_system_name varchar(128) DEFAULT NULL,
@@ -126,13 +148,14 @@ BEGIN
 
 	INSERT INTO spec.connector
 	(
-		file_id, creator_id, file_kind, domen_name, group_type, system_name,
-		visual_name, is_packable, is_readonly, color
+		file_id, creator_id, file_kind, domen_name, group_type, rc_rel_type,
+		system_name, visual_name, is_packable, is_readonly, color
 	)
 	VALUES
 	(
-		res_id, p_creator_id, core.tag_id('file-kind','connector', p_kind_tag_name),
+		res_id, p_creator_id, core.tag_id('file','kind', p_kind_tag_name),
 		p_domen_name, core.tag_id('connector','group-type', p_group_type_tag_name),
+		core.tag_id('connector','rc-rel-type', p_rcreltype_tag_name),
 		core.canonical_string(s_name), v_name, p_is_packable, p_is_readonly, p_color
 	);
 

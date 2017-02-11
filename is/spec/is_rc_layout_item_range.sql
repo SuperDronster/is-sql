@@ -9,17 +9,22 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_tag('node-kind','rc-layout', NULL, 'item-range-root',
+SELECT core.new_tag('rc-layout','node-kind', NULL, 'item-range-root',
 	'Standard Resource Layout Node');
-SELECT core.new_tag('node-kind','rc-layout', NULL, 'item-range-node',
+SELECT core.new_tag('rc-layout','node-kind', NULL, 'item-range-node',
 	'Standard Resource Layout Node');
-SELECT core.new_tag('node-kind','rc-layout', NULL, 'item-range-data',
+SELECT core.new_tag('rc-layout','node-kind', NULL, 'item-range-data',
 	'Standard Resource Layout Node');
+
+SELECT core.new_tag('rc-layout','use-type', NULL, 'fixed-item-range',
+	'Fixed Item Range');
+SELECT core.new_tag('rc-layout','use-type', NULL, 'custom-item-range',
+	'Object Item Range');
 
 CREATE TABLE rc_layout_item_range(
 	item_range_lower_index integer NOT NULL,
 	item_range_high_index integer NOT NULL,
-	CONSTRAINT rclayoutir_id_pkey PRIMARY KEY (layout_id),
+	CONSTRAINT rclayoutir_id_pkey PRIMARY KEY (rclayout_id),
 
 	-- Нельзя удалять тег вида раскладки ресурса
 	CONSTRAINT rclayoutir_kind_fk FOREIGN KEY (layout_kind)
@@ -38,7 +43,7 @@ CREATE INDEX rclayoutir_parent_ptr_idx ON rc_layout_item_range(parent_ptr);
 CREATE OR REPLACE FUNCTION __on_before_insert_rclayoutir_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_insert_rclayoutir(NEW.layout_id, NEW.resource_ptr,
+	PERFORM spec.__on_before_insert_rclayoutir(NEW.rclayout_id, NEW.resource_ptr,
 		NEW.parent_ptr, 'rc_layout_item_range'::regclass, NEW.layout_kind);
 	RETURN NEW;
 END;
@@ -47,7 +52,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION __on_before_delete_rclayoutir_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_delete_rclayoutir(OLD.layout_id);
+	PERFORM spec.__on_before_delete_rclayoutir(OLD.rclayout_id);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -67,7 +72,7 @@ CREATE TRIGGER before_insert_rclayoutir_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
 CREATE OR REPLACE FUNCTION __on_before_insert_rclayoutir(
-	p_layout_id bigint,
+	p_rclayout_id bigint,
 	p_resource_id bigint,
 	p_parent_id bigint,
 	p_child_oid oid,
@@ -75,16 +80,16 @@ CREATE OR REPLACE FUNCTION __on_before_insert_rclayoutir(
 ) RETURNS void AS $$
 DECLARE
 BEGIN
-	PERFORM spec.__on_before_insert_rclayout(p_layout_id, p_resource_id,
+	PERFORM spec.__on_before_insert_rclayout(p_rclayout_id, p_resource_id,
 		p_parent_id, p_child_oid, p_child_kind);
 END;
 $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_before_delete_rclayoutir(
-	p_layout_id bigint
+	p_rclayout_id bigint
 ) RETURNS void AS $$
 BEGIN
-	PERFORM spec.__on_before_delete_rclayout(p_layout_id);
+	PERFORM spec.__on_before_delete_rclayout(p_rclayout_id);
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -92,9 +97,10 @@ $$ LANGUAGE 'plpgsql';
 	Создание записи раскладки ресурса диапазона кол-ва элементов
 ----------------------------------------------------------------------------- */
 CREATE OR REPLACE FUNCTION new_rc_layout_item_range(
-	p_layout_id bigint,
+	p_rclayout_id bigint,
 	p_resource_id bigint,
 	p_parent_id bigint,
+	p_use_type_tag_name varchar(128),
 	p_name_tag_name varchar(128),
 	p_lower_index integer,
 	p_high_index integer,
@@ -104,24 +110,25 @@ DECLARE
 	res_id bigint;
 	name varchar;
 BEGIN
-	IF p_layout_id IS NULL THEN
+	IF p_rclayout_id IS NULL THEN
 		res_id := nextval('spec.rclayout_id_seq');
 	ELSE
-		res_id := p_layout_id;
+		res_id := p_rclayout_id;
 	END IF;
 
 	INSERT INTO spec.rc_layout_item_range
 	(
-		layout_id, parent_ptr, resource_ptr, layout_kind, name,
+		rclayout_id, parent_ptr, resource_ptr, layout_kind, name,
 		item_range_lower_index, item_range_high_index, color,
-		is_virtual
+		use_type
 	)
 	VALUES
 	(
 		res_id, p_parent_id, p_resource_id,
-		core.tag_id('node-kind','rc-layout', 'item-range-data'),
+		core.tag_id('rc-layout', 'node-kind', 'item-range-data'),
 		core.tag_id('names','rc-layout', p_name_tag_name), p_lower_index,
-		p_high_index, p_color, false
+		p_high_index, p_color,
+		core.tag_id('rc-layout','use-type', p_use_type_tag_name)
 	);
 
 	RETURN res_id;

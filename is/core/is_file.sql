@@ -8,6 +8,8 @@ SET search_path TO "core";
 
 --------------------------------------------------------------------------------
 
+SELECT new_pool(NULL, 'file', 'kind', 'File Kinds.', 0);
+
 CREATE SEQUENCE file_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
 CREATE TABLE file(
