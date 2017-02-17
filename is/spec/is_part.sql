@@ -1,5 +1,5 @@
 ﻿/* -----------------------------------------------------------------------------
-	Specification Item
+	spec Item
 	Constant:
 		_record_rel.type = 3 (Spec Item -> Spec Item)
 ----------------------------------------------------------------------------- */
@@ -20,20 +20,26 @@ CREATE TABLE part(
 	part_id bigint NOT NULL DEFAULT nextval('spec.part_id_seq'),
 	part_kind bigint NOT NULL REFERENCES core.tag(id),
 	parent_ptr bigint DEFAULT NULL,
-	specification_ptr bigint NOT NULL,
-	resource_ptr bigint DEFAULT NULL,
+	spec_ptr bigint NOT NULL,
+	resources_ptr bigint DEFAULT NULL,
 	name bigint NOT NULL REFERENCES core.tag(id),
 	color integer NOT NULL DEFAULT 0,
 	CONSTRAINT part_pkey PRIMARY KEY (part_id)
 );
 
-CREATE INDEX part_spec_ptr_idx ON part(specification_ptr);
+CREATE INDEX part_spec_ptr_idx ON part(spec_ptr);
 CREATE INDEX part_parent_ptr_idx ON part(parent_ptr);
 
 CREATE TABLE part_dep(
-	specification_ptr bigint NOT NULL,
+	spec_ptr bigint NOT NULL,
 	consumer_part_ptr bigint NOT NULL,
+	consumer_rc_layout_ptr bigint NOT NULL,
+	consumer_rc_lower_index integer,
+	consumer_rc_upper_index integer,
 	producer_part_ptr bigint NOT NULL,
+	producer_rc_layout_ptr bigint NOT NULL,
+	producer_rc_lower_index integer,
+	producer_rc_upper_index integer,
 
 	-- Удалять все ссылки на producer спец. ресурсов при удалении
 	-- consumer спец. ресурса
@@ -42,8 +48,8 @@ CREATE TABLE part_dep(
 		ON UPDATE NO ACTION ON DELETE CASCADE,
 
 	-- Нельзя удалять файл спецификации
-	CONSTRAINT partdep_spec_fk FOREIGN KEY (specification_ptr)
-		REFERENCES specification(file_id) MATCH SIMPLE
+	CONSTRAINT partdep_spec_fk FOREIGN KEY (spec_ptr)
+		REFERENCES spec(file_id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
 
 	-- Нельзя удалять producer спец. ресурс пока его использует consumer
@@ -62,8 +68,8 @@ CREATE OR REPLACE FUNCTION __on_before_insert_part_trigger()
 RETURNS trigger AS $$
 BEGIN
 	PERFORM spec.__on_before_insert_part(NEW.part_id, NEW.part_kind,
-		'spec.part'::regclass, NEW.specification_ptr, NEW.parent_ptr,
-		NEW.resource_ptr);
+		'spec.part'::regclass, NEW.spec_ptr, NEW.parent_ptr,
+		NEW.resources_ptr);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -72,7 +78,7 @@ CREATE OR REPLACE FUNCTION __on_before_delete_part_trigger()
 RETURNS trigger AS $$
 BEGIN
 	PERFORM spec.__on_before_delete_part(OLD.part_id,
-		OLD.resource_ptr);
+		OLD.resources_ptr);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -95,9 +101,9 @@ CREATE OR REPLACE FUNCTION __on_before_insert_part(
 	p_part_id bigint,
 	p_part_kind bigint,
 	p_part_oid oid,
-	p_specification_id bigint,
+	p_spec_id bigint,
 	p_parent_id bigint,
-	p_resource_id bigint
+	p_resources_id bigint
 ) RETURNS void AS $$
 DECLARE
 	count integer;
@@ -118,31 +124,31 @@ BEGIN
 
 	-- Проверяем есть ли Обьект - спецификация
 	SELECT count(*) INTO count
-	FROM spec.specification
+	FROM spec.spec
 	WHERE
-		file_id = p_specification_id;
+		file_id = p_spec_id;
 	IF count <> 1 THEN
 		PERFORM core._error('DataIsNotFound',
-			format('Specification File "id=%s" is not found.',
-				p_specification_id));
+			format('spec File "id=%s" is not found.',
+				p_spec_id));
 	END IF;
 
 
-	IF p_resource_id IS NOT NULL
+	IF p_resources_id IS NOT NULL
 	THEN
 		-- Проверяем есть ли Обьект - ресурс
 		SELECT count(*) INTO count
-		FROM spec.resource
+		FROM spec.resources
 		WHERE
-			file_id = p_resource_id;
+			file_id = p_resources_id;
 		IF count <> 1 THEN
 			PERFORM core._error('DataIsNotFound',
-				format('Resource File "id=%s" is not found.',
-					p_resource_id));
+				format('resources File "id=%s" is not found.',
+					p_resources_id));
 		END IF;
 
 		-- увеличиваем кол-во ссылок в объекте - ресурс
-		PERFORM core.__inc_file_ref(p_resource_id);
+		PERFORM core.__inc_file_ref(p_resources_id);
 	END IF;
 
 	IF p_parent_id IS NOT NULL
@@ -172,16 +178,16 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_before_delete_part(
 	p_part_id bigint,
-	p_resource_id bigint
+	p_resources_id bigint
 ) RETURNS void AS $$
 BEGIN
 	DELETE FROM spec.part
 	WHERE
 		parent_ptr = p_part_id;
-	IF p_resource_id IS NOT NULL
+	IF p_resources_id IS NOT NULL
 	THEN
 		-- уменьшаем кол-во ссылок в объекте - ресурс
-		PERFORM core.__dec_file_ref(p_resource_id);
+		PERFORM core.__dec_file_ref(p_resources_id);
 	END IF;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -210,10 +216,10 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION new_part(
 	p_id bigint,
 	p_kind_tag_name varchar(128),
-  p_specification_id bigint,
+  p_spec_id bigint,
   p_parent_id bigint,
 	p_name_tag_name varchar(128),
-	p_resource_id bigint DEFAULT NULL,
+	p_resources_id bigint DEFAULT NULL,
 	p_color integer DEFAULT 0
 ) RETURNS bigint AS $$
 DECLARE
@@ -228,14 +234,14 @@ BEGIN
 
 	INSERT INTO spec.part
 	(
-		part_id, part_kind, parent_ptr, specification_ptr,
-		resource_ptr, name, color
+		part_id, part_kind, parent_ptr, spec_ptr,
+		resources_ptr, name, color
 	)
 	VALUES
 	(
 		res_id, core.tag_id('part','node-kind', p_kind_tag_name),
-		p_parent_id, p_specification_id,
-		p_resource_id, core.tag_id('names','part', p_name_tag_name),
+		p_parent_id, p_spec_id,
+		p_resources_id, core.tag_id('names','part', p_name_tag_name),
 		p_color
 	);
 
@@ -244,12 +250,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 /* -----------------------------------------------------------------------------
-	Находит Spec Item для specification по строке пути
+	Находит Spec Item для spec по строке пути
 ----------------------------------------------------------------------------- */
 CREATE OR REPLACE FUNCTION part(
-	p_specification_id bigint,
+	p_spec_id bigint,
 	p_path varchar,
-	p_is_resource boolean DEFAULT NULL
+	p_is_resources boolean DEFAULT NULL
 ) RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
@@ -258,7 +264,7 @@ DECLARE
 	curr_id bigint;
 	name_id bigint;
 	count integer;
-	is_resource boolean;
+	is_resources boolean;
 	i integer;
 	curr_path varchar;
 BEGIN
@@ -267,12 +273,12 @@ BEGIN
 	curr_path := names[1];
 	name_id := core.tag_id('names','part', names[1]);
 
-	SELECT part_id, resource_ptr IS NOT NULL
-	INTO prev_id, is_resource
+	SELECT part_id, resources_ptr IS NOT NULL
+	INTO prev_id, is_resources
 	FROM spec.part
 	WHERE
 			name = name_id AND
-			specification_ptr = p_specification_id AND
+			spec_ptr = p_spec_id AND
 	  	parent_ptr IS NULL;
 
 	IF count > 1 THEN
@@ -281,31 +287,31 @@ BEGIN
 			curr_path := curr_path || '/' || names[i];
 			name_id := core.tag_id('names','part', names[i]);
 
-			SELECT part_id, resource_ptr IS NOT NULL
-			INTO curr_id, is_resource
+			SELECT part_id, resources_ptr IS NOT NULL
+			INTO curr_id, is_resources
 			FROM spec.part
 			WHERE
 					name = name_id AND
-					specification_ptr = p_specification_id AND
+					spec_ptr = p_spec_id AND
 			  	parent_ptr = prev_id;
 
 			IF curr_id IS NULL
 			THEN
 				PERFORM core._error('DataIsNotFound',
-					format('Spec Item "%s" For Specification "id=%s" is not found.',
-					curr_path, p_specification_id));
+					format('Spec Item "%s" For spec "id=%s" is not found.',
+					curr_path, p_spec_id));
 			END IF;
 			prev_id := curr_id;
 		END LOOP;
 	END IF;
 
 	IF prev_id IS NULL OR
-		(p_is_resource IS NOT NULL AND
-		is_resource <> p_is_resource)
+		(p_is_resources IS NOT NULL AND
+		is_resources <> p_is_resources)
 	THEN
 		PERFORM core._error('DataIsNotFound',
-			format('Spec Item "%s" For Specification "id=%s" is not found.',
-			curr_path, p_specification_id));
+			format('Spec Item "%s" For spec "id=%s" is not found.',
+			curr_path, p_spec_id));
 	END IF;
 
 	RETURN prev_id;
@@ -314,36 +320,46 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION new_part_dep(
 	p_specifcation_id bigint,
-	p_consumer_id bigint,
-	p_producer_id bigint
+	p_consumer_part_id bigint,
+	p_consumer_rc_layout_id bigint NOT NULL,
+	p_consumer_rc_lower_index integer,
+	p_consumer_rc_upper_index integer,
+	p_producer_part_id bigint,
+	p_producer_rc_layout_id bigint NOT NULL,
+	p_producer_rc_lower_index integer,
+	p_producer_rc_upper_index integer,
 ) RETURNS void AS $$
 DECLARE
 BEGIN
 	INSERT INTO spec.part_dep
 	(
-		specification_ptr,
-		consumer_part_ptr,
-		producer_part_ptr
+		spec_ptr,
+		consumer_part_ptr, consumer_rc_layout_ptr,
+		consumer_rc_lower_index, consumer_rc_upper_index,
+		producer_part_ptr, producer_rc_layout_ptr,
+		producer_rc_lower_index, producer_rc_upper_index
 	)
 	VALUES
 	(
-		p_specifcation_id,
-		p_consumer_id,
-		p_producer_id
+		p_spec_id,
+		p_consumer_part_id, p_consumer_rc_layout_id,
+		p_consumer_rc_lower_index, p_consumer_rc_upper_index,
+		p_producer_part_id, p_producer_rc_layout_id,
+		p_producer_rc_lower_index, p_producer_rc_upper_index
 	);
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION del_part_dep(
 	p_specifcation_id bigint,
-	p_consumer_id bigint,
-	p_producer_id bigint
+	p_consumer_part_id bigint,
+	p_producer_part_id bigint
 ) RETURNS void AS $$
 DECLARE
 BEGIN
 	DELETE FROM spec.part_dep
 	WHERE
-		specification_ptr = p_specifcation_id AND
+		spec_ptr = p_specifcation_id AND
 		consumer_part_ptr = p_consumer_id AND
 		producer_part_ptr = p_producer_id;
 END;

@@ -238,17 +238,19 @@ CREATE OR REPLACE FUNCTION tag_ids
 RETURNS SETOF bigint AS $$
 DECLARE
 	name varchar;
+	s_name varchar;
 	res_id bigint;
 	list varchar[] := regexp_split_to_array(p_system_names, p_delimiter);
 	pool_id integer := core.pool_id(p_role_key, p_pool_key);
 BEGIN
 	FOREACH name IN ARRAY list
 	LOOP
+		s_name := core.canonical_string(name);
 		SELECT id INTO res_id
 		FROM core.tag
 		WHERE
 			pool_ptr = pool_id AND
-			system_name = core.canonical_string(name);
+			system_name = s_name;
 
 		IF NOT FOUND THEN
 			PERFORM core._error('DataIsNotFound', format('Tag "(%s)%s.%s" is not found.',
