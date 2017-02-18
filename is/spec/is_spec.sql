@@ -23,6 +23,7 @@ CREATE TABLE spec(
 	CONSTRAINT spec_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
+
 	CONSTRAINT spec_pkey PRIMARY KEY (file_id)
 ) INHERITS(core.file);
 
@@ -132,3 +133,26 @@ BEGIN
 	RETURN res_id;
 END;
 $$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
+	Initial Data
+---------------------------------------------------------------------------- */
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 's',
+	'core.folder'::regclass, 'spec-group',
+	-1, 'Add Specification Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'spec-group',
+	'core.folder'::regclass, 'spec-group',
+	-1, 'Add Specification Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'spec-group',
+	'spec.spec'::regclass, 'standard-spec-object',
+	-1, 'Add Standard Specificaion Object.'
+);

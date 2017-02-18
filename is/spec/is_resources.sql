@@ -12,9 +12,9 @@ SELECT core.new_tag('file','kind', NULL, 'r', 'Resources Folder Root');
 SELECT core.new_tag('file','kind', NULL, 'resources-group',
 	'Resources Group');
 SELECT core.new_tag('file','kind', NULL, 'unvalued-items-resources-group',
-	'Items resources');
+	'Unvalued Items Reources Object');
 SELECT core.new_tag('file','kind', NULL, 'unvalued-items-resources-object',
-	'Items resources');
+	'Unvalued Items Reources Object');
 
 CREATE SEQUENCE rcdatatype_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
@@ -38,7 +38,7 @@ CREATE TABLE rc_side
 
 	-- Удалять все ключи при удалении пула - перечисления
 	CONSTRAINT rcside_del_fk FOREIGN KEY (pool_ptr)
-		REFERENCES pool(id) MATCH SIMPLE
+		REFERENCES core.pool(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE CASCADE,
 
 	CONSTRAINT rcside_pkey PRIMARY KEY (id)
@@ -207,10 +207,10 @@ $$ LANGUAGE plpgsql;
 CREATE  OR REPLACE FUNCTION rc_side_id(
 	p_role_key varchar(32),
 	p_pool_key varchar(32),
-	p_system_name varchar(128),
+	p_system_name varchar(128)
 ) RETURNS integer AS $$
 DECLARE
-	pool_id := core.pool_id(p_role_key, p_pool_key);
+	pool_id integer := core.pool_id(p_role_key, p_pool_key);
 BEGIN
 	RETURN
 		(SELECT id
@@ -223,7 +223,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE  OR REPLACE FUNCTION rc_side_id(
 	p_pool_id integer,
-	p_system_name varchar(128),
+	p_system_name varchar(128)
 ) RETURNS integer AS $$
 BEGIN
 	RETURN
@@ -295,3 +295,26 @@ BEGIN
 	RETURN res_id;
 END;
 $$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
+	Initial Data
+---------------------------------------------------------------------------- */
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'r',
+	'core.folder'::regclass, 'resources-group',
+	-1, 'Add Resources Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resources-group',
+	'core.folder'::regclass, 'resources-group',
+	-1, 'Add Resources Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resources-group',
+	'spec.resources'::regclass, 'unvalued-items-resources-object',
+	-1, 'Add Anvalued Item resources Object.'
+);

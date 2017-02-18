@@ -11,7 +11,8 @@ SET search_path TO "spec";
 SELECT core.new_pool(NULL, 'names', 'part', 'Part Names.', 0);
 
 SELECT core.new_pool(NULL, 'part', 'node-kind', 'Part Node Kinds.', 0);
-SELECT core.new_tag('part','node-kind', NULL, 'item-count', 'Item Count Part');
+SELECT core.new_tag('part','node-kind', NULL, 'simple-resources', 'Part Simple Resources');
+SELECT core.new_tag('part','node-kind', NULL, 'tree-resources', 'Part Tree Resources');
 SELECT core.new_tag('part','node-kind', NULL, 'group', 'Part Group');
 
 CREATE SEQUENCE part_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
@@ -49,7 +50,7 @@ CREATE TABLE part_dep(
 
 	-- Нельзя удалять файл спецификации
 	CONSTRAINT partdep_spec_fk FOREIGN KEY (spec_ptr)
-		REFERENCES spec(file_id) MATCH SIMPLE
+		REFERENCES spec.spec(file_id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
 
 	-- Нельзя удалять producer спец. ресурс пока его использует consumer
@@ -97,14 +98,16 @@ CREATE TRIGGER before_insert_part_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
-CREATE OR REPLACE FUNCTION __on_before_insert_part(
+CREATE OR REPLACE FUNCTION __on_before_insert_part
+(
 	p_part_id bigint,
 	p_part_kind bigint,
 	p_part_oid oid,
 	p_spec_id bigint,
 	p_parent_id bigint,
 	p_resources_id bigint
-) RETURNS void AS $$
+)
+RETURNS void AS $$
 DECLARE
 	count integer;
 	p_kind integer;
@@ -176,10 +179,12 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE OR REPLACE FUNCTION __on_before_delete_part(
+CREATE OR REPLACE FUNCTION __on_before_delete_part
+(
 	p_part_id bigint,
 	p_resources_id bigint
-) RETURNS void AS $$
+)
+RETURNS void AS $$
 BEGIN
 	DELETE FROM spec.part
 	WHERE
@@ -192,14 +197,16 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE  OR REPLACE FUNCTION _add_part_rel(
+CREATE  OR REPLACE FUNCTION _add_part_rel
+(
 	p_parent_table_oid oid,
 	p_parent_rec_kind_tag_name varchar(128),
 	p_child_table_oid oid,
 	p_child_rec_kind_tag_name varchar(128),
 	p_child_rec_count integer,
 	p_name varchar
-) RETURNS void AS $$
+)
+RETURNS void AS $$
 BEGIN
 	PERFORM core._add_record_rel(3, p_parent_table_oid,
 		core.tag_id('part','node-kind', p_parent_rec_kind_tag_name),
@@ -211,17 +218,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 /* -----------------------------------------------------------------------------
-	Создание записи раскладки ресурса диапазона кол-ва элементов
+	Создание записи части спецификации с ресурсом
 ----------------------------------------------------------------------------- */
-CREATE OR REPLACE FUNCTION new_part(
+CREATE OR REPLACE FUNCTION new_part_resources
+(
 	p_id bigint,
+	p_parent_id bigint,
 	p_kind_tag_name varchar(128),
   p_spec_id bigint,
-  p_parent_id bigint,
 	p_name_tag_name varchar(128),
 	p_resources_id bigint DEFAULT NULL,
 	p_color integer DEFAULT 0
-) RETURNS bigint AS $$
+)
+RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
 	name varchar;
@@ -250,13 +259,52 @@ END;
 $$ LANGUAGE plpgsql;
 
 /* -----------------------------------------------------------------------------
+	Создание записи части-группы спецификации (без ресурсов)
+----------------------------------------------------------------------------- */
+CREATE OR REPLACE FUNCTION new_part_group
+(
+	p_id bigint,
+	p_parent_id bigint,
+  p_spec_id bigint,
+	p_name_tag_name varchar(128),
+	p_color integer DEFAULT 0
+)
+RETURNS bigint AS $$
+DECLARE
+	res_id bigint;
+	name varchar;
+BEGIN
+	IF p_id IS NULL THEN
+		res_id := nextval('spec.part_id_seq');
+	ELSE
+		res_id := p_id;
+	END IF;
+
+	INSERT INTO spec.part
+	(
+		part_id, part_kind, parent_ptr, spec_ptr, name, color
+	)
+	VALUES
+	(
+		res_id, core.tag_id('part','node-kind', 'group'),
+		p_parent_id, p_spec_id, core.tag_id('names','part', p_name_tag_name),
+		p_color
+	);
+
+	RETURN res_id;
+END;
+$$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
 	Находит Spec Item для spec по строке пути
 ----------------------------------------------------------------------------- */
-CREATE OR REPLACE FUNCTION part(
+CREATE OR REPLACE FUNCTION part_id
+(
 	p_spec_id bigint,
 	p_path varchar,
 	p_is_resources boolean DEFAULT NULL
-) RETURNS bigint AS $$
+)
+RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
 	names varchar[] := regexp_split_to_array(p_path, '/');
@@ -318,17 +366,19 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE OR REPLACE FUNCTION new_part_dep(
+CREATE OR REPLACE FUNCTION new_part_dep
+(
 	p_specifcation_id bigint,
 	p_consumer_part_id bigint,
-	p_consumer_rc_layout_id bigint NOT NULL,
+	p_consumer_rc_layout_id bigint,
 	p_consumer_rc_lower_index integer,
 	p_consumer_rc_upper_index integer,
 	p_producer_part_id bigint,
-	p_producer_rc_layout_id bigint NOT NULL,
+	p_producer_rc_layout_id bigint,
 	p_producer_rc_lower_index integer,
-	p_producer_rc_upper_index integer,
-) RETURNS void AS $$
+	p_producer_rc_upper_index integer
+)
+RETURNS void AS $$
 DECLARE
 BEGIN
 	INSERT INTO spec.part_dep
@@ -350,7 +400,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION del_part_dep(
+/*CREATE OR REPLACE FUNCTION del_part_dep(
 	p_specifcation_id bigint,
 	p_consumer_part_id bigint,
 	p_producer_part_id bigint
@@ -363,4 +413,46 @@ BEGIN
 		consumer_part_ptr = p_consumer_id AND
 		producer_part_ptr = p_producer_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;*/
+
+/* -----------------------------------------------------------------------------
+	Initial Data
+----------------------------------------------------------------------------- */
+
+
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'group',
+	'spec.part'::regclass, 'group',
+	-1, 'Add Group.'
+);
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'group',
+	'spec.part'::regclass, 'simple-resources',
+	-1, 'Add Simple Resources.'
+);
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'group',
+	'spec.part'::regclass, 'tree-resources',
+	-1, 'Add Tree Resources.'
+);
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'tree-resources',
+	'spec.part'::regclass, 'tree-resources',
+	-1, 'Add Tree Resources.'
+);
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'tree-resources',
+	'spec.part'::regclass, 'group',
+	-1, 'Add Group.'
+);
+SELECT spec._add_part_rel
+(
+	'spec.part'::regclass, 'tree-resources',
+	'spec.part'::regclass, 'simple-resources',
+	-1, 'Add Simple Resources.'
+);

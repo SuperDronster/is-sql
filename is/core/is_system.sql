@@ -6,37 +6,6 @@ SET search_path TO "core";
 
 /* -----------------------------------------------------------------------------
 	Constant.
-
-  'measure'
-  'file-kind' 'folder'
-  'file-kind' 'resource'
-  'file-kind' 'specification'
-  'rc-sides'
-
-
-	Tag Group ID:
-		1 - Unit Names
-		2 - File Kinds
-			'default-resource'
-			'default-specification'
-			'rc-producer-connector',
-			'rc-consumer-connector',
-			'rc-connection-connector'
-			'rc-assoc-connector'
-		3 - Resource Layout Kinds
-			'item-range-node'
-			'item-range-data'
-		4 - Resource Layout Names
-		5 - Resource Sides Enum Names
-		6 - Resource Sides Enum Values
-		7 - Connector Group Types
-			'geometry-vertical-view'
-			'geometry-horisontal-view'
-			'item-range-connection'
-			'resource-connection'
-		8 - Specification Item Names
-		9 - Specification Item Kinds
-
 ----------------------------------------------------------------------------- */
 
 CREATE TABLE _record_rel (
@@ -52,29 +21,6 @@ CREATE TABLE _record_rel (
     parent_table_oid, parent_rec_kind,
     child_table_oid, child_rec_kind)
 );
-
---CREATE SEQUENCE _dataref_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
-
-/*CREATE TABLE _data_type_def (
-  type_id     INTEGER      NOT NULL,
-  type_role   INTEGER      NOT NULL,
-  system_name VARCHAR(128) NOT NULL,
-  visual_name VARCHAR      NOT NULL,
-  CONSTRAINT _type_def_pkey PRIMARY KEY (type_id)
-);
-
-CREATE UNIQUE INDEX _datatypedef_systemname_idx
-  ON _data_type_def (system_name);
-
-CREATE TABLE _data_table_def (
-  type_ptr   INTEGER NOT NULL,
-  table_role INTEGER NOT NULL,
-  table_oid  OID     NOT NULL,
-  CONSTRAINT _datatable_def_datatype_def_fk FOREIGN KEY (type_ptr)
-  REFERENCES _data_type_def (type_id) MATCH SIMPLE
-  ON UPDATE NO ACTION ON DELETE CASCADE,
-  CONSTRAINT _data_def_pkey PRIMARY KEY (type_ptr, table_oid)
-);*/
 
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --

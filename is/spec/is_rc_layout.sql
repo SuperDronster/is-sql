@@ -9,6 +9,7 @@ SET search_path TO "spec";
 --------------------------------------------------------------------------------
 
 SELECT core.new_pool(NULL, 'names', 'rc-layout', 'Resources Layout Names.', 0);
+
 --SELECT core.new_pool(NULL, 'rc-layout', 'node-kind', 'resources Layout Nodes.', 0);
 --SELECT core.new_tag('rc-layout','node-kind', NULL, 'range-root',
 --	'Standard resources Layout Node');
@@ -22,23 +23,23 @@ SELECT core.new_tag('rc-layout','use-type', NULL, 'custom-range', 'Object Range'
 
 CREATE TYPE rclayout_use_type AS ENUM
 (
-		'virtual_node',
-		'fixed_range',
-		'custom_range'
+	'virtual-node',
+	'fixed-range',
+	'custom-range'
 );
 
 CREATE SEQUENCE rclayout_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
 CREATE TABLE rc_layout(
-	rclayout_id bigint NOT NULL DEFAULT nextval('spec.rclayout_id_seq'),
+	id bigint NOT NULL DEFAULT nextval('spec.rclayout_id_seq'),
 	parent_ptr bigint DEFAULT NULL,
 	resources_ptr bigint NOT NULL,
-	rc_lower_index integer NOT NULL,
-	rc_high_index integer NOT NULL,
+	rc_lower_index integer DEFAULT NULL,
+	rc_high_index integer DEFAULT NULL,
 	use_type rclayout_use_type NOT NULL,
 	name bigint NOT NULL REFERENCES core.tag(id),
 	color integer NOT NULL DEFAULT 0,
-	CONSTRAINT rc_layout_pkey PRIMARY KEY (rclayout_id)
+	CONSTRAINT rc_layout_pkey PRIMARY KEY (id)
 );
 
 CREATE INDEX rc_layout_resources_ptr_idx ON rc_layout(resources_ptr);
@@ -49,8 +50,8 @@ CREATE INDEX rc_layout_parent_ptr_idx ON rc_layout(parent_ptr);
 CREATE OR REPLACE FUNCTION __on_before_insert_rclayout_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_insert_rclayout(NEW.rclayout_id, NEW.resources_ptr,
-		NEW.parent_ptr, 'spec.rc_layout'::regclass, NEW.layout_kind);
+	PERFORM spec.__on_before_insert_rclayout(NEW.id, NEW.parent_ptr,
+		NEW.resources_ptr);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -58,7 +59,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION __on_before_delete_rclayout_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_delete_rclayout(OLD.rclayout_id);
+	PERFORM spec.__on_before_delete_rclayout(OLD.id);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -77,29 +78,24 @@ CREATE TRIGGER before_delete_rclayout_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
-CREATE OR REPLACE FUNCTION __on_before_insert_rclayout(
-	p_rclayout_id bigint,
-	p_resources_id bigint,
+CREATE OR REPLACE FUNCTION __on_before_insert_rclayout
+(
+	p_id bigint,
 	p_parent_id bigint,
-	p_child_oid oid,
-	p_child_kind bigint
-) RETURNS void AS $$
+	p_resources_id bigint
+)
+RETURNS void AS $$
 DECLARE
-	p_kind integer;
-	p_oid oid;
-	c_kind integer;
-	c_oid oid;
 	count integer;
-	count_rel integer;
 BEGIN
 	-- Проверяем уникальность ИД
 	SELECT count(*) INTO count
 	FROM spec.rc_layout
 	WHERE
-		rclayout_id = p_rclayout_id;
+		id = p_id;
 	IF count <> 0 THEN
 		PERFORM core._error('DuplicateData',
-			format('resources Layout "id=%s" allready exists.', p_rclayout_id));
+			format('resources Layout "id=%s" allready exists.', p_id));
 	END IF;
 
 	-- Проверяем есть ли Обьект - ресурс
@@ -115,39 +111,32 @@ BEGIN
 	IF p_parent_id IS NOT NULL
 	THEN
 		-- Проверяем есть ли родительский объект
-		SELECT tableoid, layout_kind INTO p_oid, p_kind
+		SELECT count(*) INTO count
 		FROM spec.rc_layout
 		WHERE
-			rclayout_id = p_parent_id;
+			id = p_parent_id;
 		IF NOT FOUND THEN
 			PERFORM core._error('DataIsNotFound',
 				format('Parent Rc Layout "id=%s" is not found.',
 				p_parent_id));
 		END IF;
-
-		count_rel := core._check_record_rel(2, p_oid, p_kind, p_child_oid,
-			p_child_kind);
-		IF count_rel IS NULL THEN
-			PERFORM core._error('Forbidden',
-				format('Rc Layout Relation [(%s)%s->(%s)%s] is forbidden.',
-				core.tag_name(p_kind),p_oid::regclass,
-				core.tag_name(p_child_kind),p_child_oid::regclass));
-		END IF;
 	END IF;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE OR REPLACE FUNCTION __on_before_delete_rclayout(
-	p_rclayout_id bigint
-) RETURNS void AS $$
+CREATE OR REPLACE FUNCTION __on_before_delete_rclayout
+(
+	p_id bigint
+)
+RETURNS void AS $$
 BEGIN
 	DELETE FROM spec.rc_layout
 	WHERE
-		parent_ptr = p_rclayout_id;
+		parent_ptr = p_id;
 END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE  OR REPLACE FUNCTION _add_rclayout_rel(
+/*CREATE  OR REPLACE FUNCTION _add_rclayout_rel(
 	p_parent_table_oid oid,
 	p_parent_rec_kind_tag_name varchar(128),
 	p_child_table_oid oid,
@@ -163,34 +152,36 @@ BEGIN
 		p_child_rec_count, p_name
 	);
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;*/
 
 /* -----------------------------------------------------------------------------
 	Создание записи раскладки ресурса диапазона кол-ва элементов
 ----------------------------------------------------------------------------- */
-CREATE OR REPLACE FUNCTION new_rc_layout(
-	p_rclayout_id bigint,
-	p_resources_id bigint,
+CREATE OR REPLACE FUNCTION new_rc_layout
+(
+	p_id bigint,
 	p_parent_id bigint,
+	p_resources_id bigint,
 	p_use_type rclayout_use_type,
 	p_name_tag_name varchar(128),
 	p_lower_index integer,
 	p_high_index integer,
 	p_color integer DEFAULT 0
-) RETURNS bigint AS $$
+)
+RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
 	name varchar;
 BEGIN
-	IF p_rclayout_id IS NULL THEN
+	IF p_id IS NULL THEN
 		res_id := nextval('spec.rclayout_id_seq');
 	ELSE
-		res_id := p_rclayout_id;
+		res_id := p_id;
 	END IF;
 
-	INSERT INTO spec.rc_layout_item_range
+	INSERT INTO spec.rc_layout
 	(
-		rclayout_id, parent_ptr, resources_ptr, name,
+		id, parent_ptr, resources_ptr, name,
 		rc_lower_index, rc_high_index, color,
 		use_type
 	)
@@ -208,11 +199,13 @@ $$ LANGUAGE plpgsql;
 /* -----------------------------------------------------------------------------
 	Находит Rc Layout для resources по строке пути
 ----------------------------------------------------------------------------- */
-CREATE OR REPLACE FUNCTION rc_layout(
+CREATE OR REPLACE FUNCTION rc_layout_id
+(
 	p_resources_id bigint,
 	p_path varchar,
-	p_type oid DEFAULT NULL
-) RETURNS bigint AS $$
+	p_use_type rclayout_use_type DEFAULT NULL
+)
+RETURNS bigint AS $$
 DECLARE
 	res_id bigint;
 	names varchar[] := regexp_split_to_array(p_path, '/');
@@ -220,7 +213,7 @@ DECLARE
 	curr_id bigint;
 	name_id bigint;
 	count integer;
-	a_type oid;
+	a_use_type rclayout_use_type;
 	i integer;
 	curr_path varchar;
 BEGIN
@@ -229,8 +222,8 @@ BEGIN
 	curr_path := names[1];
 	name_id := core.tag_id('names','rc-layout', names[1]);
 
-	SELECT rclayout_id, tableoid
-	INTO prev_id, a_type
+	SELECT id, use_type
+	INTO prev_id, a_use_type
 	FROM spec.rc_layout
 	WHERE
 			name = name_id AND
@@ -243,8 +236,8 @@ BEGIN
 			curr_path := curr_path || '/' || names[i];
 			name_id := core.tag_id('names','rc-layout', names[i]);
 
-			SELECT rclayout_id, tableoid
-			INTO curr_id, a_type
+			SELECT id, use_type
+			INTO curr_id, a_use_type
 			FROM spec.rc_layout
 			WHERE
 					name = name_id AND
@@ -262,8 +255,8 @@ BEGIN
 	END IF;
 
 	IF prev_id IS NULL OR
-		(p_type IS NOT NULL AND
-		a_type <> p_type)
+		(p_use_type IS NOT NULL AND
+		a_use_type <> p_use_type)
 	THEN
 		PERFORM core._error('DataIsNotFound',
 			format('RC Layout "%s" For resources "id=%s" is not found.',

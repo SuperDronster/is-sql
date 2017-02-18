@@ -120,7 +120,7 @@ CREATE OR REPLACE FUNCTION enum_flags
 	p_system_names varchar,
 	p_delimiter char DEFAULT ':'
 )
-RETURNS SETOF integer AS $$
+RETURNS integer AS $$
 DECLARE
 	name varchar;
 	res_id integer;
@@ -142,7 +142,7 @@ CREATE OR REPLACE FUNCTION enum_flags
 	p_system_names varchar,
 	p_delimiter char DEFAULT ':'
 )
-RETURNS SETOF integer AS $$
+RETURNS integer AS $$
 DECLARE
 	name varchar;
 	res_id integer;

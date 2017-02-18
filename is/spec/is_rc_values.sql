@@ -132,4 +132,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--------------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
+	Initial Data
+---------------------------------------------------------------------------- */
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resources-group',
+	'spec.connector'::regclass, 'valued-items-resources-object',
+	-1, 'Add Anvalued Item resources Object.'
+);

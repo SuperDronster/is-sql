@@ -38,16 +38,16 @@ SELECT core.new_tag('file','kind', NULL, 'network-connection-connector-object',
 SELECT core.new_tag('file','kind', NULL, 'resource-assoc-connector-object',
 	'Resource Association Connector Object');
 
-
 CREATE TYPE connector_kind AS ENUM
 (
-	'resource-assoc'
+	'resource-assoc',
 	'resource-produce',
 	'resource-consume',
 	'node-connection',
 	'edge-connection',
-	'network-connection',
+	'network-connection'
 );
+
 CREATE TYPE connector_group_type AS ENUM
 (
 	'information-capacity',
@@ -91,6 +91,7 @@ CREATE TABLE connector(
 	CONSTRAINT connector_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
 		ON UPDATE NO ACTION ON DELETE NO ACTION,
+
 	CONSTRAINT connector_pkey PRIMARY KEY (file_id)
 ) INHERITS(core.file);
 
@@ -190,7 +191,7 @@ BEGIN
 		tag_id := core.tag_id('file','kind', 'network-connection-connector-object');
 	ELSE
 		PERFORM _error('DeveloperError', 'Wrong Connector Kind value!');
-	END IF;
+	END CASE;
 
 	IF p_system_name IS NULL THEN
 		s_name := p_domen_name;
@@ -221,3 +222,169 @@ BEGIN
 	RETURN res_id;
 END;
 $$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
+	Initial Data
+---------------------------------------------------------------------------- */
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'connector-group',
+	-1, 'Add Connector Group.'
+);
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'connector-group',
+	-1, 'Add Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'resource-produce-connector-object',
+	-1, 'Add Resource Produce Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'resource-consume-connector-object',
+	-1, 'Add Resource Consume Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'node-connection-connector-object',
+	-1, 'Add Node Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'edge-connection-connector-object',
+	-1, 'Add Edge Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'network-connection-connector-object',
+	-1, 'Add Network Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'spec.connector'::regclass, 'resource-assoc-connector-object',
+	-1, 'Add Resource Association Connector Object.'
+);
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'resource-produce-connector-group',
+	-1, 'Add Resource Produce Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'resource-consume-connector-group',
+	-1, 'Add Resource Consume Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'node-connection-connector-group',
+	-1, 'Add Node Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'edge-connection-connector-group',
+	-1, 'Add Edge Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'network-connection-connector-group',
+	-1, 'Add Network Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'c',
+	'core.folder'::regclass, 'resource-assoc-connector-group',
+	-1, 'Add Resource Assoc Connector Group.'
+);
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'resource-produce-connector-group',
+	-1, 'Add Resource Produce Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'resource-consume-connector-group',
+	-1, 'Add Resource Consume Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'node-connection-connector-group',
+	-1, 'Add Node Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'edge-connection-connector-group',
+	-1, 'Add Edge Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'network-connection-connector-group',
+	-1, 'Add Network Connection Connector Group.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'connector-group',
+	'core.folder'::regclass, 'resource-assoc-connector-group',
+	-1, 'Add Resource Assoc Connector Group.'
+);
+
+
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resource-produce-connector-group',
+	'spec.connector'::regclass, 'resource-produce-connector-object',
+	-1, 'Add Resource Produce Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resource-consume-connector-group',
+	'spec.connector'::regclass, 'resource-consume-connector-object',
+	-1, 'Add Resource Consume Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'node-connection-connector-group',
+	'spec.connector'::regclass, 'node-connection-connector-object',
+	-1, 'Add Node Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'edge-connection-connector-group',
+	'spec.connector'::regclass, 'edge-connection-connector-object',
+	-1, 'Add Edge Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'network-connection-connector-group',
+	'spec.connector'::regclass, 'network-connection-connector-object',
+	-1, 'Add Network Connection Connector Object.'
+);
+SELECT core._add_file_rel
+(
+	'core.folder'::regclass, 'resource-assoc-connector-group',
+	'spec.connector'::regclass, 'resource-assoc-connector-object',
+	-1, 'Add Resource Association Connector Object.'
+);

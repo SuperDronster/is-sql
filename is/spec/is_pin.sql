@@ -18,8 +18,8 @@ SELECT core.new_tag('pin','group', NULL, 'node', 'Spec Pin Node Group');*/
 CREATE SEQUENCE pin_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
 CREATE TABLE pin(
-	pin_id bigint NOT NULL DEFAULT nextval('spec.pin_id_seq'),
-	connector_ptr bigint NOT NULL REFERENCES spec.connector(file_id),
+	pin_id bigint NOT NULL,
+	connector_ptr bigint NOT NULL,
 	part_ptr bigint NOT NULL REFERENCES spec.part(part_id),
 	rclayout_ptr bigint REFERENCES spec.rc_layout(rclayout_id),
 	resources_side integer NOT NULL REFERENCES spec.rc_side(id),
@@ -74,6 +74,7 @@ CREATE OR REPLACE FUNCTION __on_before_insert_pin(
 	p_resources_side bigint
 ) RETURNS void AS $$
 BEGIN
+	PERFORM core.__inc_file_ref(p_connector_ptr);
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -85,6 +86,7 @@ CREATE OR REPLACE FUNCTION __on_before_delete_pin(
 	p_resources_side bigint
 ) RETURNS void AS $$
 BEGIN
+	PERFORM core.__dec_file_ref(p_connector_ptr);
 END;
 $$ LANGUAGE 'plpgsql';
 

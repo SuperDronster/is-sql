@@ -2,7 +2,6 @@
 	File Functions.
 	Constant:
 		_record_rel.type = 1 (Parent File -> Chld File Relation)
-		tag.group_id = 2 (File Type Tags)
 ----------------------------------------------------------------------------- */
 
 SET search_path TO "core";
@@ -146,10 +145,8 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE  OR REPLACE FUNCTION _add_file_rel(
 	p_parent_table_oid oid,
-	--p_parent_rec_group_tag_name varchar(128),
 	p_parent_rec_kind_tag_name varchar(128),
 	p_child_table_oid oid,
-	--p_child_rec_group_tag_name varchar(128),
 	p_child_rec_kind_tag_name varchar(128),
 	p_child_rec_count integer,
 	p_name varchar
