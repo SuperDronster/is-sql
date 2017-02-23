@@ -21,38 +21,21 @@ select core.new_tag('names','part', NULL, 'fiber-count','Fiber Count');
 
 /*
 
-select core.new_folder(1, 0, 'c', 'root', 'Root', 0, true, false);
-select core.new_folder(10, 0, 'resource-produce-connector-group', 'producers', 'Producers Connector', 0, true, false);
-select core.insert_file(0,1,10);
-
-select core.new_folder(11, 0, 'resource-consume-connector-group', 'consumers', 'Consumers Connector', 0, true, false);
-select core.insert_file(0,1,11);
-select core.new_folder(12, 0, 'node-connection-connector-group', 'connection', 'Connection Connector', 0, true, false);
-select core.insert_file(0,1,12);
-
-select spec.new_connector(101, 0, 'resource-produce', 'horisontal-view', '==', 'poin.place.map', 'Point Place on Map');
-select core.insert_file(0,10,101);
-select spec.new_connector(102, 0, 'resource-produce', 'horisontal-view', '==', 'line.place.map', 'Line Place on Map');
-select core.insert_file(0,10,102);
-
-select spec.new_connector(111, 0, 'resource-consume', 'horisontal-view', '==', 'point.place', 'Point Place');
-select core.insert_file(0,11,111);
-select spec.new_connector(112, 0, 'resource-consume', 'horisontal-view', '==', 'line.place', 'Line Place');
-select core.insert_file(0,11,112);
-
-select spec.new_connector(121, 0, 'node-connection', 'range-connection', '==', 'pairs.copper', 'Copper Pairs Group');
-select core.insert_file(0,12,121);
-select spec.new_connector(122, 0, 'node-connection', 'resource-connection', '==', 'ends.cable', 'Cable Ends');
-select core.insert_file(0,12,122);
-select spec.new_connector(123, 0, 'node-connection', 'resource-connection', '==', 'ends.cable.copper', 'Copper Cable Ends');
-select core.insert_file(0,12,123);
-select spec.new_connector(124, 0, 'node-connection', 'resource-connection', '==', 'ends.ur', 'Ur Ends');
-select core.insert_file(0,12,124);
+select spec.new_connector(NULL, 'resource-produce', 'horisontal-view', '==', 'poin.place.map', 'Point Place on Map');
+select spec.new_connector(NULL, 'resource-produce', 'horisontal-view', '==', 'line.place.map', 'Line Place on Map');
+select spec.new_connector(NULL, 'resource-consume', 'horisontal-view', '==', 'point.place', 'Point Place');
+select spec.new_connector(NULL, 'resource-consume', 'horisontal-view', '==', 'line.place', 'Line Place');
+select spec.new_connector(NULL, 'node-connection', 'range-connection', '==', 'pairs.copper', 'Copper Pairs Group');
+select spec.new_connector(NULL, 'node-connection', 'resource-connection', '==', 'ends.cable', 'Cable Ends');
+select spec.new_connector(NULL, 'node-connection', 'resource-connection', '==', 'ends.cable.copper', 'Copper Cable Ends');
+select spec.new_connector(NULL, 'node-connection', 'resource-connection', '==', 'ends.ur', 'Ur Ends');
 
 
-select core.new_folder(2, 0, 'r', 'root', 'Root', 0, true, false);
+--select core.new_folder(2, 0, 'r', 'root', 'Root', 0, true, false);
+
+
 select core.new_folder(20, 0, 'resources-group', 'std', 'Standard Resource', 0, true, false);
-select core.insert_file(0,2,20);
+select core.insert_file(0,root_file_id('r'),20);
 select core.new_folder(200, 0, 'resources-group', 'item-count', 'Item Count', 0, true, false);
 select core.insert_file(0,20,200);
 select spec.new_resources(2000, 0, NULL,27, 'facility', '27-optical-fibers', '27 Optical Fibers');
@@ -88,16 +71,16 @@ select spec.new_rc_layout(22,7,2000,'fixed_range','1-blue', 9,9);
 */
 
 /*
-select core.new_folder(3, 0, 's', 'root', 'Root', 0, true, false);
 select core.new_folder(30, 0, 'spec-group', 'cables', 'Cables', 0, true, false);
-select core.insert_file(0,3,30);
+select core.insert_file(0,root_file_id('s'),30);
 select core.new_folder(300, 0, 'spec-group', 'optical', 'Optical', 0, true, false);
 select core.insert_file(0,30,300);
-select spec.new_spec(3000, 0, 'FLAGS', '27fibers-12mm', '27 Fibers Optical Cable. 12mm.');
+select spec.new_spec(3000, 0, 'facility', '27fibers-12mm', '27 Fibers Optical Cable. 12mm.');
 select core.insert_file(0,300,3000);
 
-select spec.new_part(1,NULL,	'group', 	3000, 'shell', 		NULL);
-select spec.new_part(2,1,	'resources', 	3000, 'fiber-count', 	2000);
+select spec.new_part_group(1,NULL, 3000, 'shell');
+select spec.new_part_resources(2,1, 3000, 'fiber-count', 
+	core.file_id('r', 'std/item-count/27-optical-fibers', 'spec.resources'::regclass));
 
 */
 

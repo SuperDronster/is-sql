@@ -300,6 +300,9 @@ $$ LANGUAGE plpgsql;
 	Initial Data
 ---------------------------------------------------------------------------- */
 
+SELECT core.new_folder(NULL, 0, 'r', 'root', 'Resources Catalog', 0,
+	true, false);
+
 SELECT core._add_file_rel
 (
 	'core.folder'::regclass, 'r',

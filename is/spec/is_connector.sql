@@ -8,7 +8,7 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_tag('file','kind', NULL, 'c', 'Connector Folder Root');
+/*SELECT core.new_tag('file','kind', NULL, 'c', 'Connector Folder Root');
 SELECT core.new_tag('file','kind', NULL, 'connector-group',
 	'Connector Group');
 
@@ -36,7 +36,9 @@ SELECT core.new_tag('file','kind', NULL, 'edge-connection-connector-object',
 SELECT core.new_tag('file','kind', NULL, 'network-connection-connector-object',
 	'Network Connection Connector Object');
 SELECT core.new_tag('file','kind', NULL, 'resource-assoc-connector-object',
-	'Resource Association Connector Object');
+	'Resource Association Connector Object');*/
+
+CREATE SEQUENCE connector_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
 CREATE TYPE connector_kind AS ENUM
 (
@@ -82,27 +84,29 @@ SELECT core.new_tag('connector','rc-rel-type', NULL, '==', 'Equals');
 SELECT core.new_tag('connector','rc-rel-type', NULL, 'any', 'Any');*/
 
 CREATE TABLE connector(
+	id integer NOT NULL,
 	kind connector_kind NOT NULL,
 	group_type connector_group_type NOT NULL,
 	rc_rel_type connector_rc_rel_type,
 	domen_name varchar NOT NULL NOT NULL,
+	description varchar DEFAULT NULL,
 
 	-- Нельзя удалять тег - вид файла
-	CONSTRAINT connector_filekind_fk FOREIGN KEY (file_kind)
+	/*CONSTRAINT connector_filekind_fk FOREIGN KEY (file_kind)
 		REFERENCES core.tag(id) MATCH SIMPLE
-		ON UPDATE NO ACTION ON DELETE NO ACTION,
+		ON UPDATE NO ACTION ON DELETE NO ACTION,*/
 
-	CONSTRAINT connector_pkey PRIMARY KEY (file_id)
-) INHERITS(core.file);
+	CONSTRAINT connector_pkey PRIMARY KEY (id)
+);
 
-CREATE INDEX connector_systemname_idx ON connector(system_name);
+CREATE UNIQUE INDEX connector_systemname_idx ON connector(domen_name);
 
 -- Triggers
 
 CREATE OR REPLACE FUNCTION __on_before_insert_connector_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_insert_connector(NEW.file_id);
+	PERFORM spec.__on_before_insert_connector(NEW.id);
 	RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -110,7 +114,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION __on_before_delete_connector_trigger()
 RETURNS trigger AS $$
 BEGIN
-	PERFORM spec.__on_before_delete_connector(OLD.file_id,OLD.ref_counter);
+	PERFORM spec.__on_before_delete_connector(OLD.id);
 	RETURN OLD;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -130,53 +134,49 @@ CREATE TRIGGER before_insert_connector_trigger
 -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ --
 
 CREATE OR REPLACE FUNCTION __on_before_insert_connector(
-	p_file_id bigint
+	p_id integer
 ) RETURNS void AS $$
 DECLARE
 	count integer;
 BEGIN
-	PERFORM core.__on_before_insert_file(p_file_id);
+	--PERFORM core.__on_before_insert_file(p_file_id);
 END;
 $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION __on_before_delete_connector(
-	p_file_id bigint,
-	p_ref_counter bigint
+	p_id integer
 ) RETURNS void AS $$
 BEGIN
-	PERFORM core.__on_before_delete_file(p_file_id, p_ref_counter);
+	--PERFORM core.__on_before_delete_file(p_file_id, p_ref_counter);
 END;
 $$ LANGUAGE 'plpgsql';
 
 /* -----------------------------------------------------------------------------
 	Создание файла - кол-ва ресурса
 ---------------------------------------------------------------------------- */
-CREATE OR REPLACE FUNCTION new_connector(
-	p_id bigint,
-	p_creator_id integer,
+CREATE OR REPLACE FUNCTION new_connector
+(
+	p_id integer,
 	p_kind connector_kind,
 	p_group_type connector_group_type,
 	p_rc_rel_type connector_rc_rel_type,
 	p_domen_name varchar,
-	p_system_name varchar(128) DEFAULT NULL,
-	p_visual_name varchar DEFAULT NULL,
-	p_color integer DEFAULT 0,
-	p_is_readonly boolean DEFAULT true,
-	p_is_packable boolean DEFAULT true
-) RETURNS bigint AS $$
+	p_description varchar DEFAULT NULL
+)
+RETURNS integer AS $$
 DECLARE
-	res_id bigint;
+	res_id integer;
 	v_name varchar;
 	s_name varchar;
 	tag_id bigint;
 BEGIN
 	IF p_id IS NULL THEN
-		res_id := nextval('core.file_id_seq');
+		res_id := nextval('spec.connector_id_seq');
 	ELSE
 		res_id := p_id;
 	END IF;
 
-	CASE p_kind
+	/*CASE p_kind
 	WHEN 'resource-assoc' THEN
 		tag_id := core.tag_id('file','kind', 'resource-assoc-connector-object');
 	WHEN 'resource-produce' THEN
@@ -191,9 +191,9 @@ BEGIN
 		tag_id := core.tag_id('file','kind', 'network-connection-connector-object');
 	ELSE
 		PERFORM _error('DeveloperError', 'Wrong Connector Kind value!');
-	END CASE;
+	END CASE;*/
 
-	IF p_system_name IS NULL THEN
+	/*IF p_system_name IS NULL THEN
 		s_name := p_domen_name;
 	ELSE
 		s_name := p_system_name;
@@ -202,21 +202,16 @@ BEGIN
 		v_name := s_name;
 	ELSE
 		v_name := p_visual_name;
-	END IF;
+	END IF;*/
 
 	INSERT INTO spec.connector
 	(
-		file_id, creator_id, file_kind, domen_name, kind,
-		group_type, rc_rel_type,
-		system_name, visual_name, is_packable, is_readonly,
-		color
+		id, domen_name, kind, group_type, rc_rel_type, drescription
 	)
 	VALUES
 	(
-		res_id, p_creator_id, tag_id,
-		p_domen_name, p_kind, p_group_type,p_rc_rel_type,
-		core.canonical_string(s_name),
-		v_name, p_is_packable, p_is_readonly, p_color
+		res_id, core.canonical(p_domen_name), p_kind, p_group_type,
+		p_rc_rel_type, p_description
 	);
 
 	RETURN res_id;
@@ -224,10 +219,29 @@ END;
 $$ LANGUAGE plpgsql;
 
 /* -----------------------------------------------------------------------------
+	Возвращает визуальное наименование ключа перечисления
+----------------------------------------------------------------------------- */
+CREATE  OR REPLACE FUNCTION connector_id
+(
+	p_domen_name varchar
+)
+RETURNS varchar AS $$
+DECLARE
+	res integer;
+BEGIN
+	RETURN
+		(SELECT id
+		FROM soec.connector
+		WHERE
+		 	domen_name = p_domen_name);
+END;
+$$ LANGUAGE plpgsql;
+
+/* -----------------------------------------------------------------------------
 	Initial Data
 ---------------------------------------------------------------------------- */
 
-SELECT core._add_file_rel
+/*SELECT core._add_file_rel
 (
 	'core.folder'::regclass, 'c',
 	'core.folder'::regclass, 'connector-group',
@@ -387,4 +401,4 @@ SELECT core._add_file_rel
 	'core.folder'::regclass, 'resource-assoc-connector-group',
 	'spec.connector'::regclass, 'resource-assoc-connector-object',
 	-1, 'Add Resource Association Connector Object.'
-);
+);*/

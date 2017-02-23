@@ -8,7 +8,7 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_tag('file','kind', NULL, 't', 'Class Folder Root');
+SELECT core.new_tag('file','kind', NULL, 'c', 'Class Folder Root');
 SELECT core.new_tag('file','kind', NULL, 'class-group',
 	'Class Group');
 
@@ -157,9 +157,11 @@ $$ LANGUAGE plpgsql;
 	Initial Data
 ---------------------------------------------------------------------------- */
 
+SELECT core.new_folder(NULL, 0, 'c', 'root', 'Class Catalog', 0, true, false);
+
 SELECT core._add_file_rel
 (
-	'core.folder'::regclass, 't',
+	'core.folder'::regclass, 'c',
 	'core.folder'::regclass, 'class-group',
 	-1, 'Add Class Group.'
 );
@@ -175,4 +177,3 @@ SELECT core._add_file_rel
 	'spec.connector'::regclass, 'standard-class-object',
 	-1, 'Add Standard Class Object.'
 );
-

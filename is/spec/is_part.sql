@@ -17,6 +17,12 @@ SELECT core.new_tag('part','node-kind', NULL, 'group', 'Part Group');
 
 CREATE SEQUENCE part_id_seq INCREMENT BY 1 MINVALUE 1000 START WITH 1000;
 
+CREATE TYPE part_dep_type AS ENUM
+(
+	'1:1',
+	'1:N'
+);
+
 CREATE TABLE part(
 	part_id bigint NOT NULL DEFAULT nextval('spec.part_id_seq'),
 	part_kind bigint NOT NULL REFERENCES core.tag(id),
@@ -32,6 +38,7 @@ CREATE INDEX part_spec_ptr_idx ON part(spec_ptr);
 CREATE INDEX part_parent_ptr_idx ON part(parent_ptr);
 
 CREATE TABLE part_dep(
+	type part_dep_type NOT NULL,
 	spec_ptr bigint NOT NULL,
 	consumer_part_ptr bigint NOT NULL,
 	consumer_rc_layout_ptr bigint NOT NULL,
@@ -185,14 +192,44 @@ CREATE OR REPLACE FUNCTION __on_before_delete_part
 	p_resources_id bigint
 )
 RETURNS void AS $$
+DECLARE
+	data_type spec.rc_data_type%ROWTYPE;
 BEGIN
+	-- Удаление всех дочерних частей спецификации
 	DELETE FROM spec.part
 	WHERE
 		parent_ptr = p_part_id;
+
+	-- Удаление кастомных статических данных
+	PERFORM spec.__delete_part_custom_data(p_part_id);
+
+	-- Уменьшение кол-во ссылок в объекте - ресурс
 	IF p_resources_id IS NOT NULL
 	THEN
-		-- уменьшаем кол-во ссылок в объекте - ресурс
 		PERFORM core.__dec_file_ref(p_resources_id);
+	END IF;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION __delete_part_custom_data
+(
+	p_part_id bigint
+)
+RETURNS void AS $$
+DECLARE
+	table_name varchar;
+BEGIN
+	table_name := (spec.part_data_type(p_part_id)).static_table;
+	IF table_name IS NOT NULL THEN
+		EXECUTE
+			'
+			DELETE FROM $1
+			WHERE
+				part_ptr = $2
+			'
+ 		USING
+			table_name,
+			p_part_id;
 	END IF;
 END;
 $$ LANGUAGE 'plpgsql';
@@ -366,8 +403,40 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
+/* -----------------------------------------------------------------------------
+	Возвращает запись ресурсов для части спецификации
+----------------------------------------------------------------------------- */
+CREATE OR REPLACE FUNCTION part_resources
+(
+	p_id bigint
+)
+RETURNS spec.resources AS $$
+	SELECT rc.*
+	FROM spec.part pr
+		JOIN spec.resources rc ON (pr.resources_ptr = rc.file_id)
+	WHERE
+		pr.part_id = p_id;
+$$ LANGUAGE sql;
+
+/* -----------------------------------------------------------------------------
+	Возвращает запись типа данных для части спецификации
+----------------------------------------------------------------------------- */
+CREATE OR REPLACE FUNCTION part_data_type
+(
+	p_id bigint
+)
+RETURNS spec.rc_data_type AS $$
+	SELECT dt.*
+	FROM spec.part pr
+		INNER JOIN spec.resources rc ON (pr.resources_ptr = rc.file_id)
+		LEFT JOIN spec.rc_data_type dt ON (rc.data_type_ptr = dt.id)
+	WHERE
+		pr.part_id = p_id;
+$$ LANGUAGE sql;
+
 CREATE OR REPLACE FUNCTION new_part_dep
 (
+	p_type part_dep_type,
 	p_specifcation_id bigint,
 	p_consumer_part_id bigint,
 	p_consumer_rc_layout_id bigint,
@@ -383,7 +452,7 @@ DECLARE
 BEGIN
 	INSERT INTO spec.part_dep
 	(
-		spec_ptr,
+		type, spec_ptr,
 		consumer_part_ptr, consumer_rc_layout_ptr,
 		consumer_rc_lower_index, consumer_rc_upper_index,
 		producer_part_ptr, producer_rc_layout_ptr,
@@ -391,7 +460,7 @@ BEGIN
 	)
 	VALUES
 	(
-		p_spec_id,
+		p_type, p_spec_id,
 		p_consumer_part_id, p_consumer_rc_layout_id,
 		p_consumer_rc_lower_index, p_consumer_rc_upper_index,
 		p_producer_part_id, p_producer_rc_layout_id,

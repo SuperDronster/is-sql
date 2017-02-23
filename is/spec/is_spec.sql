@@ -8,16 +8,16 @@ SET search_path TO "spec";
 
 --------------------------------------------------------------------------------
 
-SELECT core.new_tag('file','kind', NULL, 's', 'Spec Folder Root');
-SELECT core.new_tag('file','kind', NULL, 'spec-group', 'Spec Group');
+SELECT core.new_tag('file','kind', NULL, 's', 'Specification Folder Root');
+SELECT core.new_tag('file','kind', NULL, 'spec-group', 'Specification Group');
 
 SELECT core.new_tag('file','kind', NULL, 'standard-spec-group',
-	'Standard Spec Group');
+	'Standard Specification Group');
 SELECT core.new_tag('file','kind', NULL, 'standard-spec-object',
-	'Standard Spec Object');
+	'Standard Specification Object');
 
 CREATE TABLE spec(
-	dependency_flags integer DEFAULT 0,
+	object_kind class_object_kind NOT NULL,
 
 	-- Нельзя удалять тег - вид файла
 	CONSTRAINT spec_filekind_fk FOREIGN KEY (file_kind)
@@ -94,8 +94,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION new_spec(
 	p_id bigint,
 	p_creator_id integer,
-	--p_kind_tag_name varchar(128),
-	p_obj_dep_flag_tag_names varchar,
+	p_object_kind class_object_kind,
 	p_system_name varchar(128) DEFAULT NULL,
 	p_visual_name varchar DEFAULT NULL,
 	p_color integer DEFAULT 0,
@@ -120,13 +119,13 @@ BEGIN
 
 	INSERT INTO spec.spec
 	(
-		file_id, creator_id, file_kind, dependency_flags, system_name,
+		file_id, creator_id, file_kind, object_kind, system_name,
 		visual_name, is_packable, is_readonly, color
 	)
 	VALUES
 	(
 		res_id, p_creator_id, core.tag_id('file','kind', 'standard-spec-object'),
-		0, core.canonical_string(p_system_name), v_name, p_is_packable,
+		p_object_kind, core.canonical_string(p_system_name), v_name, p_is_packable,
 		p_is_readonly, p_color
 	);
 
@@ -134,9 +133,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION spec_rc
+(
+	p_file_id bigint
+)
+RETURNS resources AS $$
+BEGIN
+	RETURN
+		(SELECT rc.*
+		FROM spec.spec sp
+			JOIN spec.resources rc ON (sp.resources_ptr = rc.file_id));
+END;
+$$ LANGUAGE plpgsql;
+
+
 /* -----------------------------------------------------------------------------
 	Initial Data
 ---------------------------------------------------------------------------- */
+
+SELECT core.new_folder(NULL, 0, 's', 'root', 'Specification Catalog', 0,
+	true, false);
 
 SELECT core._add_file_rel
 (
