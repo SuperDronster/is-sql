@@ -24,7 +24,7 @@ CREATE TYPE class_object_kind AS ENUM
 );
 
 CREATE TABLE class(
-	interface_ptr integer DEFAULT NULL REFERENCES spec._interface_def(id),
+	type_ptr integer DEFAULT NULL REFERENCES spec._type_def(id),
 	spec_folder_ptr bigint DEFAULT NULL,
 	object_kind class_object_kind NOT NULL,
 	object_role integer DEFAULT NULL REFERENCES core.pool(id),
@@ -108,7 +108,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION new_class(
 	p_id bigint,
 	p_creator_id integer,
-	p_interface_id integer,
+	p_type_id integer,
 	p_spec_folder_id bigint,
 	p_object_kind class_object_kind,
 	p_object_role integer,
@@ -137,19 +137,242 @@ BEGIN
 
 	INSERT INTO spec.connector
 	(
-		file_id, creator_id, file_kind, interface_ptr, spec_folder_ptr,
+		file_id, creator_id, file_kind, type_ptr, spec_folder_ptr,
 		object_kind, object_role, object_state,
 		system_name, visual_name, is_packable, is_readonly, color
 	)
 	VALUES
 	(
 		res_id, p_creator_id, core.tag_id('file','kind', 'standard-class-object'),
-		p_interface_id, spec_folder_id, p_object_kind, p_object_role, p_object_state,
+		p_type_id, spec_folder_id, p_object_kind, p_object_role, p_object_state,
 		core.canonical_string(p_system_name), v_name, p_is_packable, p_is_readonly,
 		p_color
 	);
 
 	RETURN res_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION _insert_object_interface_record
+(
+	p_type_name VARCHAR,
+	p_attr_name VARCHAR,
+	p_properties JSON,
+	p_record_id BIGINT
+)
+RETURNS void AS $$
+DECLARE
+	t_name varchar = core._type_attr_storage(p_type_name, p_attr_name);
+	r_prop RECORD;
+	sql_field_names varchar;
+	sql_value_names varchar;
+	sql_value varchar;
+	sql_command varchar;
+	json_value varchar;
+	res_id bigint;
+BEGIN
+	IF t_name IS NULL
+	THEN
+		PERFORM core._error('DeveloperError',
+			format('Object Interface Record Table %s.%s is not found.',
+				p_type_name, p_attr_name));
+	END IF;
+	sql_field_names := NULL;
+	sql_value_names := NULL;
+	FOR r_prop IN
+		SELECT * FROM core._public_table_properties(t_name::regclass)
+	LOOP
+		IF
+			NOT r_prop.is_default AND
+			(p_properties->r_prop.name) IS NULL THEN
+
+			PERFORM core._error('WrongData',
+				format('Mandatory value %s.%s.%s is not definde.',
+					p_type_name, p_attr_name, r_prop.name));
+		END IF;
+		json_value := (p_properties->>r_prop.name);
+		IF json_value IS NULL THEN
+			PERFORM core._error('WrongData',
+				format('Value for Interface Property %s.%s.%s is not defined.',
+					p_type_name, p_attr_name, r_prop.name));
+		END IF;
+		IF sql_field_names IS NULL THEN
+			sql_field_names := quote_ident(r_prop.name);
+		ELSE
+			sql_field_names := sql_field_names || ',' || quote_ident(r_prop.name);
+		END IF;
+		IF json_value IS NULL THEN
+			IF NOT r_prop.is_nullable THEN
+				PERFORM core._error('WrongData',
+					format('Mandatory value %s.%s.%s can not be NULL.',
+						p_type_name, p_attr_name, r_prop.name));
+			END IF;
+			sql_value := 'NULL';
+		ELSE
+			sql_value := '---';
+			CASE r_prop.data_type
+				WHEN 'boolean' THEN
+					sql_value := json_value::boolean::varchar;
+				WHEN 'smallint' THEN
+					sql_value := json_value::smallint::varchar;
+				WHEN 'bigint' THEN
+					sql_value := json_value::bigint::varchar;
+				WHEN 'integer' THEN
+					sql_value := json_value::integer::varchar;
+				WHEN 'float' THEN
+					sql_value := json_value::real::varchar;
+				WHEN 'double' THEN
+					sql_value := json_value::double precision::varchar;
+				WHEN 'numeric' THEN
+					sql_value := json_value::numeric::varchar;
+				WHEN 'money' THEN
+					sql_value := json_value::numeric::varchar;
+				WHEN 'date' THEN
+					sql_value := to_date(json_value::varchar, 'YYYY.MM.DD');
+					sql_value := 'to_date(''' || json_value::varchar || ''',''YYYY.MM.DD'')';
+				WHEN 'time' THEN
+					sql_value := to_timestamp(json_value::varchar, 'HH24:MI:SS');
+					sql_value := 'to_timestamp(''' || json_value::varchar || ''',''HH24.MI.SS'')::TIME';
+				WHEN 'interval' THEN
+					sql_value := json_value::interval;
+					sql_value := '''' || json_value::varchar || '''::interval';
+				WHEN 'string' THEN
+					sql_value := 'E' || quote_literal(json_value::varchar);
+				WHEN 'timestamp' THEN
+					sql_value := 'to_timestamp(' || json_value::bigint::varchar || ')';
+			ELSE
+				PERFORM core._error('DeveloperError',
+					format('Unsupported interface property type %s.',
+						r_prop.data_type));
+			END CASE;
+		END IF;
+		IF sql_value_names IS NULL THEN
+			sql_value_names := sql_value;
+		ELSE
+			sql_value_names := sql_value_names || ',' || sql_value;
+		END IF;
+	END LOOP;
+
+	sql_field_names := '_object_ptr' || ',' || sql_field_names;
+	sql_value_names := p_record_id || ',' || sql_value_names;
+
+	sql_command :=
+		'INSERT INTO ' || t_name ||
+		'(' || sql_field_names || ')' || ' VALUES ' ||
+		'(' || sql_value_names || ');';
+	EXECUTE sql_command;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION _insert_object_resource_record
+(
+	p_table_name VARCHAR,
+	p_properties JSON,
+	p_object_id BIGINT,
+	p_part_id BIGINT,
+	p_rc_index INTEGER
+)
+RETURNS void AS $$
+DECLARE
+	r_prop RECORD;
+	sql_field_names varchar;
+	sql_value_names varchar;
+	sql_value varchar;
+	sql_command varchar;
+	json_value varchar;
+	res_id bigint;
+BEGIN
+	IF p_table_name IS NULL
+	THEN
+		PERFORM core._error('DeveloperError',
+			format('Object Resource Record Table %s.%s is not found.',
+				p_type_name, p_attr_name));
+	END IF;
+	sql_field_names := NULL;
+	sql_value_names := NULL;
+	FOR r_prop IN
+		SELECT * FROM core._public_table_properties(p_table_name::regclass)
+	LOOP
+		IF
+			NOT r_prop.is_default AND
+			(p_properties->r_prop.name) IS NULL THEN
+
+			PERFORM core._error('WrongData',
+				format('Mandatory value %s.%s.%s is not definde.',
+					p_type_name, p_attr_name, r_prop.name));
+		END IF;
+		json_value := (p_properties->>r_prop.name);
+		IF json_value IS NULL THEN
+			PERFORM core._error('WrongData',
+				format('Value for Interface Property %s.%s.%s is not defined.',
+					p_type_name, p_attr_name, r_prop.name));
+		END IF;
+		IF sql_field_names IS NULL THEN
+			sql_field_names := quote_ident(r_prop.name);
+		ELSE
+			sql_field_names := sql_field_names || ',' || quote_ident(r_prop.name);
+		END IF;
+		IF json_value IS NULL THEN
+			IF NOT r_prop.is_nullable THEN
+				PERFORM core._error('WrongData',
+					format('Mandatory value %s.%s.%s can not be NULL.',
+						p_type_name, p_attr_name, r_prop.name));
+			END IF;
+			sql_value := 'NULL';
+		ELSE
+			sql_value := '---';
+			CASE r_prop.data_type
+				WHEN 'boolean' THEN
+					sql_value := json_value::boolean::varchar;
+				WHEN 'smallint' THEN
+					sql_value := json_value::smallint::varchar;
+				WHEN 'bigint' THEN
+					sql_value := json_value::bigint::varchar;
+				WHEN 'integer' THEN
+					sql_value := json_value::integer::varchar;
+				WHEN 'float' THEN
+					sql_value := json_value::real::varchar;
+				WHEN 'double' THEN
+					sql_value := json_value::double precision::varchar;
+				WHEN 'numeric' THEN
+					sql_value := json_value::numeric::varchar;
+				WHEN 'money' THEN
+					sql_value := json_value::numeric::varchar;
+				WHEN 'date' THEN
+					sql_value := to_date(json_value::varchar, 'YYYY.MM.DD');
+					sql_value := 'to_date(''' || json_value::varchar || ''',''YYYY.MM.DD'')';
+				WHEN 'time' THEN
+					sql_value := to_timestamp(json_value::varchar, 'HH24:MI:SS');
+					sql_value := 'to_timestamp(''' || json_value::varchar || ''',''HH24.MI.SS'')::TIME';
+				WHEN 'interval' THEN
+					sql_value := json_value::interval;
+					sql_value := '''' || json_value::varchar || '''::interval';
+				WHEN 'string' THEN
+					sql_value := 'E' || quote_literal(json_value::varchar);
+				WHEN 'timestamp' THEN
+					sql_value := 'to_timestamp(' || json_value::bigint::varchar || ')';
+			ELSE
+				PERFORM core._error('DeveloperError',
+					format('Unsupported interface property type %s.',
+						r_prop.data_type));
+			END CASE;
+		END IF;
+		IF sql_value_names IS NULL THEN
+			sql_value_names := sql_value;
+		ELSE
+			sql_value_names := sql_value_names || ',' || sql_value;
+		END IF;
+	END LOOP;
+
+	sql_field_names := '_object_ptr,_part_ptr,_rc_index,' || sql_field_names;
+	sql_value_names := p_object_id || ',' || p_part_id || ',' || p_rc_index ||
+		',' || sql_value_names;
+
+	sql_command :=
+		'INSERT INTO ' || p_table_name ||
+		'(' || sql_field_names || ')' || ' VALUES ' ||
+		'(' || sql_value_names || ');';
+	EXECUTE sql_command;
 END;
 $$ LANGUAGE plpgsql;
 

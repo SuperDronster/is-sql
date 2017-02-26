@@ -35,7 +35,6 @@ CREATE TABLE Unit
 (
 	id integer NOT NULL DEFAULT nextval('unit_id_seq'),
 	kind bigint NOT NULL REFERENCES Tag(id),
-	order_index integer DEFAULT 0,
 	basa_unit_ptr integer DEFAULT NULL REFERENCES Unit(id),
 	system_name varchar(24) NOT NULL,
 	visual_name varchar NOT NULL,
@@ -43,6 +42,7 @@ CREATE TABLE Unit
 	format_result_string varchar NOT NULL,
 	to_kf float NOT NULL DEFAULT 1.0,
 	fr_kf float NOT NULL DEFAULT 1.0,
+	order_index integer DEFAULT 0,
 	CONSTRAINT unit_pkey PRIMARY KEY (id),
 	CONSTRAINT unit_unique UNIQUE (system_name)
 );

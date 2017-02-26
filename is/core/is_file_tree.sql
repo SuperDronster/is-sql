@@ -9,11 +9,11 @@ SET search_path TO "core";
 --------------------------------------------------------------------------------
 
 CREATE TABLE file_tree(
-	color integer NOT NULL DEFAULT 0,
-	creator_id integer NOT NULL DEFAULT 0,
-	create_time timestamp NOT NULL DEFAULT now(),
 	parent_file_ptr bigint NOT NULL,
 	child_file_ptr bigint NOT NULL,
+	creator_id integer NOT NULL DEFAULT 0,
+	create_time timestamp NOT NULL DEFAULT now(),
+	color integer NOT NULL DEFAULT 0,
 	CONSTRAINT file_tree_pk PRIMARY KEY (parent_file_ptr,child_file_ptr)
 );
 CREATE INDEX file_tree_parent_idx ON file_tree(parent_file_ptr);

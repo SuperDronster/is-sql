@@ -61,7 +61,7 @@ CREATE OR REPLACE FUNCTION __on_before_delete_file(
 ) RETURNS void AS $$
 BEGIN
 	IF p_ref_counter <> 0 THEN
-		PERFORM _error('ImpossibleOperation',
+		PERFORM core._error('ImpossibleOperation',
 			format('Can not Delete File "link counter=%s".',p_ref_counter));
 	END IF;
 	DELETE FROM core.file_tree
